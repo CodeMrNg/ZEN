@@ -26,6 +26,10 @@ if (appNode) {
         noData: "Aucune donnee disponible",
         noExecution: "Aucune execution",
         noExecutionYet: "Aucune execution enregistree pour le moment. Utilisez le formulaire de saisie ou chargez un jeu de donnees de demonstration.",
+        monthTradesTitle: "Trades du mois",
+        monthTradesSubtitle: "trade(s) pour",
+        monthTradesEmpty: "Aucun trade enregistre pour le mois selectionne.",
+        monthTradesCountSuffix: "trade(s) ce mois",
         radarTitle: "Radar de performance",
         cumulativeTitle: "Courbe de P&L cumulatif",
         dailyTitle: "P&L net quotidien",
@@ -42,6 +46,12 @@ if (appNode) {
         notes: "Notes",
         noNotes: "Aucune note n a ete renseignee pour ce trade.",
         editTradeButton: "Modifier le trade",
+        countdownOverdue: "Depasse de",
+        countdownDisabled: "Desactive",
+        countdownDay: "j",
+        countdownHour: "h",
+        countdownMinute: "min",
+        countdownSecond: "s",
     } : {
         loading: "Loading...",
         gainCapital: "Capital gain (%)",
@@ -65,6 +75,10 @@ if (appNode) {
         noData: "No data available",
         noExecution: "No execution",
         noExecutionYet: "No execution has been recorded yet. Use the entry form or load a demo dataset.",
+        monthTradesTitle: "Monthly trades",
+        monthTradesSubtitle: "trade(s) for",
+        monthTradesEmpty: "No trade has been recorded for the selected month.",
+        monthTradesCountSuffix: "trade(s) this month",
         radarTitle: "Performance radar",
         cumulativeTitle: "Cumulative P&L curve",
         dailyTitle: "Daily net P&L",
@@ -81,6 +95,12 @@ if (appNode) {
         notes: "Notes",
         noNotes: "No note was provided for this trade.",
         editTradeButton: "Edit trade",
+        countdownOverdue: "Overdue by",
+        countdownDisabled: "Disabled",
+        countdownDay: "d",
+        countdownHour: "h",
+        countdownMinute: "m",
+        countdownSecond: "s",
     };
     const setButtonLoading = window.AkiliUI?.setButtonLoading || ((button, isLoading, label) => {
         if (!button) {
@@ -159,6 +179,13 @@ if (appNode) {
     const detailModalSubtitle = document.getElementById("detail-modal-subtitle");
     const detailModalBody = document.getElementById("detail-modal-body");
     const closeDetailModalButton = document.getElementById("close-detail-modal");
+    const monthTradesButton = document.getElementById("month-trades-button");
+    const monthTradesCount = document.getElementById("month-trades-count");
+    const monthTradesModal = document.getElementById("month-trades-modal");
+    const monthTradesModalTitle = document.getElementById("month-trades-modal-title");
+    const monthTradesModalSubtitle = document.getElementById("month-trades-modal-subtitle");
+    const monthTradesList = document.getElementById("month-trades-list");
+    const closeMonthTradesModalButton = document.getElementById("close-month-trades-modal");
     const tradeForm = document.getElementById("trade-form");
     const lastUpdate = document.getElementById("last-update");
     const symbolInput = document.getElementById("symbol");
@@ -181,10 +208,13 @@ if (appNode) {
     const calendarGrid = document.getElementById("calendar-grid");
     const expandButtons = document.querySelectorAll("[data-expand-panel]");
     const tradeFormSubmitButton = tradeForm.querySelector('button[type="submit"]');
+    const serverRefreshBanner = document.querySelector("[data-server-refresh-due-at]");
+    const serverRefreshCountdown = document.getElementById("server-refresh-countdown");
 
     document.addEventListener("DOMContentLoaded", () => {
         renderMetricSkeletons();
         seedExecutedAt();
+        initializeServerRefreshCountdown();
         bindEvents();
         loadDashboard();
     });
@@ -201,11 +231,15 @@ if (appNode) {
         if (demoButton) {
             demoButton.addEventListener("click", handleDemoSeed);
         }
+        if (monthTradesButton) {
+            monthTradesButton.addEventListener("click", openMonthTradesModal);
+        }
         openTradeModalButton.addEventListener("click", openTradeModal);
         openTradeModalSecondaryButton.addEventListener("click", openTradeModal);
         closeTradeModalButton.addEventListener("click", closeTradeModal);
         closePanelModalButton.addEventListener("click", closePanelModal);
         closeDetailModalButton.addEventListener("click", closeDetailModal);
+        closeMonthTradesModalButton.addEventListener("click", closeMonthTradesModal);
         expandButtons.forEach((button) => {
             button.addEventListener("click", () => openPanelModal(button.dataset.expandPanel));
         });
@@ -215,6 +249,8 @@ if (appNode) {
         gpValueInput.addEventListener("input", updateCapitalImpactPreview);
         screenshotInput.addEventListener("change", handleScreenshotChange);
         recentTradesContainer.addEventListener("click", handleTradeCardClick);
+        monthTradesList.addEventListener("click", handleTradeCardClick);
+        monthTradesList.addEventListener("click", handleTradeEditClick);
         calendarGrid.addEventListener("click", handleCalendarCellClick);
         expandedCalendarGrid.addEventListener("click", handleCalendarCellClick);
         detailModalBody.addEventListener("click", handleTradeCardClick);
@@ -234,6 +270,11 @@ if (appNode) {
                 closeDetailModal();
             }
         });
+        monthTradesModal.addEventListener("click", (event) => {
+            if (event.target.matches("[data-close-month-trades-modal]")) {
+                closeMonthTradesModal();
+            }
+        });
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && !tradeModal.hidden) {
                 closeTradeModal();
@@ -244,7 +285,59 @@ if (appNode) {
             if (event.key === "Escape" && !detailModal.hidden) {
                 closeDetailModal();
             }
+            if (event.key === "Escape" && !monthTradesModal.hidden) {
+                closeMonthTradesModal();
+            }
         });
+    }
+
+    function formatServerRefreshCountdown(totalSeconds) {
+        const isOverdue = totalSeconds < 0;
+        let remaining = Math.abs(Math.floor(totalSeconds));
+        const days = Math.floor(remaining / 86400);
+        remaining -= days * 86400;
+        const hours = Math.floor(remaining / 3600);
+        remaining -= hours * 3600;
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining - (minutes * 60);
+
+        let value = "";
+        if (days > 0) {
+            value = `${days} ${strings.countdownDay} ${hours} ${strings.countdownHour} ${minutes} ${strings.countdownMinute} ${seconds} ${strings.countdownSecond}`;
+        } else if (hours > 0) {
+            value = `${hours} ${strings.countdownHour} ${minutes} ${strings.countdownMinute} ${seconds} ${strings.countdownSecond}`;
+        } else if (minutes > 0) {
+            value = `${minutes} ${strings.countdownMinute} ${seconds} ${strings.countdownSecond}`;
+        } else {
+            value = `${seconds} ${strings.countdownSecond}`;
+        }
+
+        return isOverdue ? `${strings.countdownOverdue} ${value}` : value;
+    }
+
+    function initializeServerRefreshCountdown() {
+        if (!serverRefreshBanner || !serverRefreshCountdown) {
+            return;
+        }
+
+        const dueAt = serverRefreshBanner.dataset.serverRefreshDueAt;
+        if (!dueAt) {
+            serverRefreshCountdown.textContent = strings.countdownDisabled;
+            return;
+        }
+
+        const dueDate = new Date(dueAt);
+        if (Number.isNaN(dueDate.getTime())) {
+            return;
+        }
+
+        const tick = () => {
+            const totalSeconds = Math.floor((dueDate.getTime() - Date.now()) / 1000);
+            serverRefreshCountdown.textContent = formatServerRefreshCountdown(totalSeconds);
+        };
+
+        tick();
+        window.setInterval(tick, 1000);
     }
 
     function getCsrfToken() {
@@ -444,7 +537,7 @@ if (appNode) {
     }
 
     function updateModalOpenState() {
-        const hasVisibleModal = !tradeModal.hidden || !panelModal.hidden || !detailModal.hidden;
+        const hasVisibleModal = !tradeModal.hidden || !panelModal.hidden || !detailModal.hidden || !monthTradesModal.hidden;
         document.body.classList.toggle("modal-open", hasVisibleModal);
     }
 
@@ -551,6 +644,10 @@ if (appNode) {
 
     function closeDetailModal() {
         closeModal(detailModal);
+    }
+
+    function closeMonthTradesModal() {
+        closeModal(monthTradesModal);
     }
 
     async function handleScreenshotChange(event) {
@@ -698,6 +795,7 @@ if (appNode) {
         renderCharts(payload.charts);
         renderCalendar(payload.calendar);
         renderRecentTrades(payload.recent_trades);
+        renderMonthlyTrades(payload.monthly_trades || [], payload.summary.selected_month_label);
         updateTradeCapitalHint();
         if (demoButton) {
             demoButton.hidden = payload.overview.all_time_trade_count > 0;
@@ -713,6 +811,10 @@ if (appNode) {
             state.tradeLookup.set(String(trade.id), trade);
         });
 
+        (payload.monthly_trades || []).forEach((trade) => {
+            state.tradeLookup.set(String(trade.id), trade);
+        });
+
         Object.entries(state.dayTradeMap).forEach(([date, trades]) => {
             trades.forEach((trade) => {
                 state.tradeLookup.set(String(trade.id), trade);
@@ -722,6 +824,29 @@ if (appNode) {
         payload.calendar.rows.flat().forEach((day) => {
             state.calendarDayMap[day.iso] = day;
         });
+    }
+
+    function buildTradeCardMarkup(trade) {
+        return `
+            <button type="button" class="recent-trade recent-trade-button" data-trade-id="${trade.id}">
+                ${trade.screenshot_url ? `<img class="recent-trade-image" src="${trade.screenshot_url}" alt="Capture ${escapeHtml(trade.symbol)}">` : ""}
+                <div class="recent-trade-header">
+                    <div class="recent-trade-title">
+                        <strong>${escapeHtml(trade.symbol)} | ${escapeHtml(trade.direction)}</strong>
+                        <span>${escapeHtml(trade.setup)}</span>
+                    </div>
+                    <span class="pnl-pill ${trade.pnl_tone}">${escapeHtml(trade.pnl_formatted)}</span>
+                </div>
+                <div class="recent-trade-meta">
+                    <span>${escapeHtml(trade.executed_at_label)}</span>
+                    <span>${escapeHtml(trade.result_label)} | ${escapeHtml(trade.ratio_label)}</span>
+                </div>
+                <div class="recent-trade-meta">
+                    <span>${escapeHtml(trade.gp_value_label)} | ${escapeHtml(trade.capital_change_percent_label)}</span>
+                    <span>${escapeHtml(trade.market)}</span>
+                </div>
+            </button>
+        `;
     }
 
     function renderMonthOptions(options, selectedValue) {
@@ -744,7 +869,7 @@ if (appNode) {
             return `
                 <article class="metric-card ${metric.tone}">
                     <div class="metric-card-header">
-                        <div>
+                        <div class="metric-card-copy">
                             <span class="metric-card-title">${metric.label}</span>
                             <strong class="metric-card-value">${metric.value}</strong>
                             <p class="metric-card-detail">${metric.detail}</p>
@@ -1032,28 +1157,32 @@ if (appNode) {
             return;
         }
 
-        container.innerHTML = trades.map((trade) => {
-            return `
-                <button type="button" class="recent-trade recent-trade-button" data-trade-id="${trade.id}">
-                    ${trade.screenshot_url ? `<img class="recent-trade-image" src="${trade.screenshot_url}" alt="Capture ${escapeHtml(trade.symbol)}">` : ""}
-                    <div class="recent-trade-header">
-                        <div class="recent-trade-title">
-                            <strong>${escapeHtml(trade.symbol)} | ${escapeHtml(trade.direction)}</strong>
-                            <span>${escapeHtml(trade.setup)}</span>
-                        </div>
-                        <span class="pnl-pill ${trade.pnl_tone}">${escapeHtml(trade.pnl_formatted)}</span>
-                    </div>
-                    <div class="recent-trade-meta">
-                        <span>${escapeHtml(trade.executed_at_label)}</span>
-                        <span>${escapeHtml(trade.result_label)} | ${escapeHtml(trade.ratio_label)}</span>
-                    </div>
-                    <div class="recent-trade-meta">
-                        <span>${escapeHtml(trade.gp_value_label)} | ${escapeHtml(trade.capital_change_percent_label)}</span>
-                        <span>${escapeHtml(trade.market)}</span>
-                    </div>
-                </button>
+        container.innerHTML = trades.map((trade) => buildTradeCardMarkup(trade)).join("");
+    }
+
+    function renderMonthlyTrades(trades, selectedMonthLabel) {
+        if (monthTradesCount) {
+            monthTradesCount.textContent = `${trades.length} ${strings.monthTradesCountSuffix}`;
+        }
+
+        if (!monthTradesButton || !monthTradesList || !monthTradesModalSubtitle) {
+            return;
+        }
+
+        monthTradesButton.hidden = !trades.length;
+        monthTradesModalTitle.textContent = strings.monthTradesTitle;
+        monthTradesModalSubtitle.textContent = `${trades.length} ${strings.monthTradesSubtitle} ${selectedMonthLabel}`;
+
+        if (!trades.length) {
+            monthTradesList.innerHTML = `
+                <div class="empty-state">
+                    ${strings.monthTradesEmpty}
+                </div>
             `;
-        }).join("");
+            return;
+        }
+
+        monthTradesList.innerHTML = trades.map((trade) => buildTradeCardMarkup(trade)).join("");
     }
 
     function handleTradeCardClick(event) {
@@ -1097,6 +1226,21 @@ if (appNode) {
         }
 
         openDayDetail(date);
+    }
+
+    function openMonthTradesModal() {
+        if (!state.lastPayload) {
+            return;
+        }
+
+        const trades = state.lastPayload.monthly_trades || [];
+        if (!trades.length) {
+            return;
+        }
+
+        monthTradesModalTitle.textContent = strings.monthTradesTitle;
+        monthTradesModalSubtitle.textContent = `${trades.length} ${strings.monthTradesSubtitle} ${state.lastPayload.summary.selected_month_label}`;
+        openModal(monthTradesModal);
     }
 
     function openPanelModal(kind) {
@@ -1207,6 +1351,10 @@ if (appNode) {
         const trade = state.tradeLookup.get(String(tradeId));
         if (!trade) {
             return;
+        }
+
+        if (!monthTradesModal.hidden) {
+            closeMonthTradesModal();
         }
 
         detailModalTitle.textContent = `${trade.symbol} | ${trade.direction}`;

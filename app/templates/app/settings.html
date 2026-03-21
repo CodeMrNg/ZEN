@@ -357,6 +357,57 @@
                     </p>
                 </section>
 
+                {% if request.user.is_superuser and server_refresh %}
+                    <section class="settings-section settings-section-accent">
+                        <div class="settings-section-copy">
+                            <h3>{% tr 'settings.server.title' 'Actualisation mensuelle du serveur' %}</h3>
+                            <p>
+                                {% tr 'settings.server.copy' 'Seul le super administrateur peut suivre, actualiser ou desactiver l echeance mensuelle d actualisation du serveur.' %}
+                            </p>
+                        </div>
+
+                        <div class="settings-summary">
+                            <article class="detail-card">
+                                <span>{% tr 'settings.server.status' 'Statut' %}</span>
+                                <strong>{{ server_refresh.status_label }}</strong>
+                            </article>
+                            <article class="detail-card">
+                                <span>{% tr 'settings.server.countdown' 'Compte a rebours' %}</span>
+                                <strong>{{ server_refresh.countdown_label }}</strong>
+                            </article>
+                            <article class="detail-card">
+                                <span>{% tr 'settings.server.last_refresh' 'Derniere actualisation' %}</span>
+                                <strong>{{ server_refresh.last_refreshed_at_label }}</strong>
+                            </article>
+                            <article class="detail-card">
+                                <span>{% tr 'settings.server.next_due' 'Prochaine echeance' %}</span>
+                                <strong>{{ server_refresh.due_at_label }}</strong>
+                            </article>
+                        </div>
+
+                        <div class="server-refresh-actions">
+                            {% if server_refresh.is_enabled %}
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="server_refresh_mark_updated">
+                                    <button type="submit" class="success-button" data-loading-text="{% tr 'settings.server.refresh_loading' 'Actualisation...' %}">{% tr 'settings.server.refresh' 'Actualiser maintenant' %}</button>
+                                </form>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="server_refresh_disable">
+                                    <button type="submit" class="ghost-button" data-loading-text="{% tr 'settings.server.disable_loading' 'Desactivation...' %}">{% tr 'settings.server.disable' 'Desactiver le suivi' %}</button>
+                                </form>
+                            {% else %}
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="server_refresh_enable">
+                                    <button type="submit" class="success-button" data-loading-text="{% tr 'settings.server.enable_loading' 'Activation...' %}">{% tr 'settings.server.enable' 'Activer un nouveau cycle' %}</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </section>
+                {% endif %}
+
                 <section class="settings-section">
                     <div class="settings-section-copy">
                         <h3>{% tr 'settings.section.security' 'Securite' %}</h3>

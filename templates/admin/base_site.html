@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | ZEN TRADING{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="icon" type="image/png" href="{% static 'app/favicon.png' %}">
+<link rel="shortcut icon" type="image/png" href="{% static 'app/favicon.png' %}">
+<link rel="apple-touch-icon" href="{% static 'app/favicon.png' %}">
+<style>
+    html {
+        zoom: 0.9;
+    }
+
+    #branding h1 {
+        margin: 0;
+    }
+
+    #site-name a {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+    }
+
+    #site-name img {
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 0 16px rgba(200, 248, 0, 0.22);
+    }
+
+    @media (max-width: 767px) {
+        #site-name img {
+            width: 28px;
+            height: 28px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <img src="{% static 'app/logo.png' %}" alt="ZEN TRADING">
+        <span>ZEN TRADING Admin</span>
+    </a>
+</h1>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

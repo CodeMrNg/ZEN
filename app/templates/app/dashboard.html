@@ -96,6 +96,41 @@
             </div>
         </header>
 
+        {% if request.user.is_superuser and server_refresh and server_refresh.is_enabled %}
+            <section
+                class="panel server-refresh-banner{% if server_refresh.is_overdue %} is-overdue{% endif %}"
+                {% if server_refresh.due_at_iso %}data-server-refresh-due-at="{{ server_refresh.due_at_iso }}"{% endif %}
+            >
+                <div class="server-refresh-copy">
+                    <div>
+                        <p class="panel-kicker">{% tr 'server_refresh.dashboard.kicker' 'Serveur' %}</p>
+                        <h2>{% tr 'server_refresh.dashboard.title' 'Actualisation mensuelle du serveur' %}</h2>
+                        <p>{{ server_refresh.summary_label }}</p>
+                    </div>
+                    <a href="{% url 'app:settings' %}" class="ghost-button">{% tr 'server_refresh.dashboard.manage' 'Gerer dans les parametres' %}</a>
+                </div>
+
+                <div class="server-refresh-stats">
+                    <article class="detail-card">
+                        <span>{% tr 'server_refresh.dashboard.status' 'Statut' %}</span>
+                        <strong>{{ server_refresh.status_label }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'server_refresh.dashboard.countdown' 'Compte a rebours' %}</span>
+                        <strong id="server-refresh-countdown">{{ server_refresh.countdown_label }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'server_refresh.dashboard.next_due' 'Prochaine echeance' %}</span>
+                        <strong>{{ server_refresh.due_at_label }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'server_refresh.dashboard.last_refresh' 'Derniere actualisation' %}</span>
+                        <strong>{{ server_refresh.last_refreshed_at_label }}</strong>
+                    </article>
+                </div>
+            </section>
+        {% endif %}
+
         <section class="toolbar">
             <div class="toolbar-status">
                 <span class="status-dot"></span>
@@ -265,6 +300,20 @@
                     <div>
                         <p class="panel-kicker">{% tr 'dashboard.panel.activity' 'Activite' %}</p>
                         <h2>{% tr 'dashboard.panel.recent_trades' 'Executions recentes' %}</h2>
+                    </div>
+                    <div class="panel-actions">
+                        <span class="form-badge" id="month-trades-count">--</span>
+                        <button
+                            type="button"
+                            class="panel-expand"
+                            id="month-trades-button"
+                            aria-label="{% tr 'dashboard.panel.open_month_trades' 'Afficher tous les trades du mois' %}"
+                            hidden
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 7h12M6 12h12M6 17h12"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -465,6 +514,24 @@
             </div>
 
             <div class="dashboard-modal-body" id="detail-modal-body"></div>
+        </section>
+    </div>
+
+    <div class="dashboard-modal" id="month-trades-modal" hidden aria-hidden="true">
+        <div class="dashboard-modal-backdrop" data-close-month-trades-modal></div>
+        <section class="dashboard-modal-dialog dashboard-modal-dialog-detail" role="dialog" aria-modal="true" aria-labelledby="month-trades-modal-title">
+            <div class="dashboard-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'dashboard.modal.details' 'Details' %}</p>
+                    <h2 id="month-trades-modal-title">{% tr 'dashboard.modal.month_trades' 'Trades du mois' %}</h2>
+                    <p class="dashboard-modal-subtitle" id="month-trades-modal-subtitle">{% tr 'dashboard.modal.loading_month_trades' 'Chargement des trades du mois...' %}</p>
+                </div>
+                <button type="button" class="modal-close" id="close-month-trades-modal" aria-label="{% tr 'dashboard.modal.close_month_trades' 'Fermer la liste des trades du mois' %}">X</button>
+            </div>
+
+            <div class="dashboard-modal-body">
+                <div class="recent-trades recent-trades-modal" id="month-trades-list"></div>
+            </div>
         </section>
     </div>
 

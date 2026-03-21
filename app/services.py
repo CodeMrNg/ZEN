@@ -11,7 +11,14 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from .localization import normalize_language, translate
-from .models import CURRENCY_SYMBOLS, CapitalMovement, Trade, TradingAccount, TradingPreference
+from .models import (
+    CURRENCY_SYMBOLS,
+    CapitalMovement,
+    ServerRefreshStatus,
+    Trade,
+    TradingAccount,
+    TradingPreference,
+)
 
 MONTH_LABELS = {
     'fr': {
@@ -96,6 +103,33 @@ def format_signed_percent(value):
     return f'{sign}{amount:,.2f}%'
 
 
+def format_local_datetime(value):
+    return timezone.localtime(value).strftime('%d/%m/%Y %H:%M')
+
+
+def format_countdown_compact(total_seconds, language=None):
+    code = normalize_language(language)
+    labels = {
+        'fr': {'day': 'j', 'hour': 'h', 'minute': 'min', 'second': 's'},
+        'en': {'day': 'd', 'hour': 'h', 'minute': 'm', 'second': 's'},
+        'es': {'day': 'd', 'hour': 'h', 'minute': 'min', 'second': 's'},
+        'pt': {'day': 'd', 'hour': 'h', 'minute': 'min', 'second': 's'},
+    }.get(code, {'day': 'd', 'hour': 'h', 'minute': 'm', 'second': 's'})
+
+    remaining = max(int(total_seconds), 0)
+    days, remainder = divmod(remaining, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    if days:
+        return f"{days} {labels['day']} {hours} {labels['hour']} {minutes} {labels['minute']} {seconds} {labels['second']}"
+    if hours:
+        return f"{hours} {labels['hour']} {minutes} {labels['minute']} {seconds} {labels['second']}"
+    if minutes:
+        return f"{minutes} {labels['minute']} {seconds} {labels['second']}"
+    return f"{seconds} {labels['second']}"
+
+
 def get_month_start(value):
     return date(value.year, value.month, 1)
 
@@ -142,6 +176,93 @@ def compute_drawdown(cumulative_values):
 def get_or_create_preferences_for_user(user_id):
     preferences, _ = TradingPreference.objects.get_or_create(user_id=user_id)
     return preferences
+
+
+def get_or_create_server_refresh_status():
+    server_refresh, _ = ServerRefreshStatus.objects.get_or_create(
+        pk=1,
+        defaults={
+            'is_enabled': True,
+            'last_refreshed_at': timezone.now(),
+        },
+    )
+    return server_refresh
+
+
+def enable_server_refresh_tracking():
+    server_refresh = get_or_create_server_refresh_status()
+    server_refresh.is_enabled = True
+    server_refresh.last_refreshed_at = timezone.now()
+    server_refresh.save(update_fields=['is_enabled', 'last_refreshed_at', 'updated_at'])
+    return server_refresh
+
+
+def disable_server_refresh_tracking():
+    server_refresh = get_or_create_server_refresh_status()
+    if server_refresh.is_enabled:
+        server_refresh.is_enabled = False
+        server_refresh.save(update_fields=['is_enabled', 'updated_at'])
+    return server_refresh
+
+
+def mark_server_refresh_updated():
+    server_refresh = get_or_create_server_refresh_status()
+    server_refresh.is_enabled = True
+    server_refresh.last_refreshed_at = timezone.now()
+    server_refresh.save(update_fields=['is_enabled', 'last_refreshed_at', 'updated_at'])
+    return server_refresh
+
+
+def build_server_refresh_snapshot(language=None):
+    server_refresh = get_or_create_server_refresh_status()
+    due_at = server_refresh.next_refresh_due_at if server_refresh.is_enabled else None
+    seconds_remaining = int((due_at - timezone.now()).total_seconds()) if due_at else None
+    is_overdue = bool(server_refresh.is_enabled and seconds_remaining is not None and seconds_remaining < 0)
+
+    if not server_refresh.is_enabled:
+        status_label = tr('server_refresh.status.disabled', language=language, default='Desactive')
+        countdown_label = tr('server_refresh.countdown.disabled', language=language, default='Desactive')
+        summary_label = tr(
+            'server_refresh.summary.disabled',
+            language=language,
+            default='Le suivi mensuel de l actualisation serveur est desactive.',
+        )
+    elif is_overdue:
+        overdue_duration = format_countdown_compact(abs(seconds_remaining), language=language)
+        status_label = tr('server_refresh.status.overdue', language=language, default='En retard')
+        countdown_label = tr(
+            'server_refresh.countdown.overdue',
+            language=language,
+            default='Depasse de {duration}',
+            duration=overdue_duration,
+        )
+        summary_label = tr(
+            'server_refresh.summary.overdue',
+            language=language,
+            default='L actualisation mensuelle du serveur est depassee. Actualisez-la ou desactivez le suivi dans les parametres.',
+        )
+    else:
+        status_label = tr('server_refresh.status.enabled', language=language, default='Suivi actif')
+        countdown_label = format_countdown_compact(seconds_remaining, language=language)
+        summary_label = tr(
+            'server_refresh.summary.enabled',
+            language=language,
+            default='Prochaine actualisation requise avant le {date}.',
+            date=format_local_datetime(due_at),
+        )
+
+    return {
+        'is_enabled': server_refresh.is_enabled,
+        'is_overdue': is_overdue,
+        'status_label': status_label,
+        'summary_label': summary_label,
+        'countdown_label': countdown_label,
+        'last_refreshed_at': server_refresh.last_refreshed_at,
+        'last_refreshed_at_label': format_local_datetime(server_refresh.last_refreshed_at),
+        'due_at': due_at,
+        'due_at_iso': timezone.localtime(due_at).isoformat() if due_at else '',
+        'due_at_label': format_local_datetime(due_at) if due_at else '--',
+    }
 
 
 def build_account_label(account, language=None):
@@ -545,17 +666,21 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
     avg_win_loss_score = 100 if avg_win_loss_ratio >= 3 else clamp((avg_win_loss_ratio / 3) * 100)
     drawdown_score = 100 if max_drawdown == 0 else clamp(100 - abs(max_drawdown) / max(abs(total_net), 1) * 60)
     recovery_score = 100 if recovery_factor >= 4 else clamp((max(recovery_factor, 0) / 4) * 100)
-    overall_score = round(
-        (
-            win_rate
-            + consistency_score
-            + profit_factor_score
-            + avg_win_loss_score
-            + drawdown_score
-            + recovery_score
+    if not filtered_trades:
+        overall_score = 0
+        drawdown_score = 0
+    else:
+        overall_score = round(
+            (
+                win_rate
+                + consistency_score
+                + profit_factor_score
+                + avg_win_loss_score
+                + drawdown_score
+                + recovery_score
+            )
+            / 6
         )
-        / 6
-    )
 
     if filtered_trades:
         best_setup_name = max(setup_performance.items(), key=lambda item: item[1])[0]
@@ -573,7 +698,8 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
             tr('dashboard.insight.empty_three', language=language, default='Un jeu de donnees de demonstration peut egalement etre charge.'),
         ]
 
-    recent_trades = [serialize_trade(trade, currency, language=language) for trade in reversed(trades[-6:])]
+    monthly_trades = [serialize_trade(trade, currency, language=language) for trade in reversed(filtered_trades)]
+    recent_trades = monthly_trades[:5]
 
     metric_cards = [
         {
@@ -686,6 +812,7 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
         },
         'calendar': build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_day, currency, language=language),
         'recent_trades': recent_trades,
+        'monthly_trades': monthly_trades,
         'preferences': serialize_preferences(preferences, current_capital=current_capital, account=active_account, language=language),
     }
 

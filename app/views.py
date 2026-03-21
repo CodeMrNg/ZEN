@@ -27,16 +27,20 @@ from .models import TradingAccount
 from .localization import normalize_language, translate
 from .services import (
     archive_trading_account_for_user,
+    build_server_refresh_snapshot,
     build_account_label,
     build_transactions_payload_for_user,
     build_dashboard_payload_for_user,
     create_capital_movement_for_user,
     create_trade_for_user,
+    disable_server_refresh_tracking,
+    enable_server_refresh_tracking,
     format_currency,
     format_signed_percent,
     get_or_create_active_account_for_user,
     get_current_capital_for_user,
     get_or_create_preferences_for_user,
+    mark_server_refresh_updated,
     get_archived_trading_accounts_for_user,
     get_trading_accounts_for_user,
     restore_trading_account_for_user,
@@ -171,6 +175,7 @@ def dashboard_view(request):
             'trade_current_capital': get_current_capital_for_user(request.user.pk, preferences, account=active_account),
             'active_account': active_account,
             'trading_accounts': get_trading_accounts_for_user(request.user.pk),
+            'server_refresh': build_server_refresh_snapshot(language=getattr(request, 'LANGUAGE_CODE', None)) if request.user.is_superuser else None,
         },
     )
 
@@ -218,6 +223,7 @@ def settings_view(request):
     language = normalize_language(getattr(request, 'LANGUAGE_CODE', None))
     preferences = get_or_create_preferences_for_user(request.user.pk)
     active_account = get_or_create_active_account_for_user(request.user.pk, preferences)
+    server_refresh = build_server_refresh_snapshot(language=language) if request.user.is_superuser else None
     success_message = None
     error_message = None
     show_account_form_modal = False
@@ -343,6 +349,51 @@ def settings_view(request):
                 update_session_auth_hash(request, user)
                 success_message = translate('views.success.password_updated', language=language, default='Mot de passe mis a jour.')
                 password_form = TradingPasswordChangeForm(request.user, language=language)
+        elif action == 'server_refresh_mark_updated':
+            if request.user.is_superuser:
+                mark_server_refresh_updated()
+                server_refresh = build_server_refresh_snapshot(language=language)
+                success_message = translate(
+                    'views.success.server_refresh_updated',
+                    language=language,
+                    default='Le compte a rebours serveur a ete reinitialise pour un mois.',
+                )
+            else:
+                error_message = translate(
+                    'views.error.super_admin_only',
+                    language=language,
+                    default='Action reservee au super administrateur.',
+                )
+        elif action == 'server_refresh_disable':
+            if request.user.is_superuser:
+                disable_server_refresh_tracking()
+                server_refresh = build_server_refresh_snapshot(language=language)
+                success_message = translate(
+                    'views.success.server_refresh_disabled',
+                    language=language,
+                    default='Le suivi mensuel du serveur a ete desactive.',
+                )
+            else:
+                error_message = translate(
+                    'views.error.super_admin_only',
+                    language=language,
+                    default='Action reservee au super administrateur.',
+                )
+        elif action == 'server_refresh_enable':
+            if request.user.is_superuser:
+                enable_server_refresh_tracking()
+                server_refresh = build_server_refresh_snapshot(language=language)
+                success_message = translate(
+                    'views.success.server_refresh_enabled',
+                    language=language,
+                    default='Le suivi mensuel du serveur a ete reactive pour un nouveau cycle.',
+                )
+            else:
+                error_message = translate(
+                    'views.error.super_admin_only',
+                    language=language,
+                    default='Action reservee au super administrateur.',
+                )
         elif action == 'delete_account':
             delete_account_form = DeleteAccountForm(request.POST, user=request.user, language=language)
             if delete_account_form.is_valid():
@@ -388,6 +439,7 @@ def settings_view(request):
             'delete_account_form': delete_account_form,
             'success_message': success_message,
             'error_message': error_message,
+            'server_refresh': server_refresh,
         },
     )
 

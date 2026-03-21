@@ -1,12 +1,16 @@
 from django.contrib import admin
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import CapitalMovement, SocialLink, Trade, TradingAccount, TradingPreference
+from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
 
 
 admin.site.site_header = "ZEN TRADING Admin"
 admin.site.site_title = "ZEN TRADING"
 admin.site.index_title = "Administration"
+admin.site.empty_value_display = "--"
 
 
 @admin.register(Trade)
@@ -279,6 +283,82 @@ class CapitalMovementAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(ServerRefreshStatus)
+class ServerRefreshStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "display_tracking_status",
+        "last_refreshed_at",
+        "display_next_refresh_due_at",
+        "display_is_overdue",
+        "updated_at",
+    )
+    readonly_fields = (
+        "display_tracking_status",
+        "display_next_refresh_due_at",
+        "display_is_overdue",
+        "created_at",
+        "updated_at",
+    )
+    fieldsets = (
+        (
+            "Suivi mensuel",
+            {
+                "fields": (
+                    "is_enabled",
+                    "last_refreshed_at",
+                    "display_tracking_status",
+                    "display_next_refresh_due_at",
+                    "display_is_overdue",
+                )
+            },
+        ),
+        (
+            "Meta",
+            {
+                "classes": ("collapse",),
+                "fields": ("created_at", "updated_at"),
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return not ServerRefreshStatus.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        if ServerRefreshStatus.objects.exists():
+            status = ServerRefreshStatus.objects.first()
+            return redirect(reverse("admin:app_serverrefreshstatus_change", args=[status.pk]))
+        return super().changelist_view(request, extra_context=extra_context)
+
+    @admin.display(description="Statut")
+    def display_tracking_status(self, obj):
+        if not obj.is_enabled:
+            return format_html(
+                '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;'
+                'border:1px solid rgba(143,155,179,.24);background:rgba(143,155,179,.12);font-weight:700;">Desactive</span>'
+            )
+        if obj.is_overdue:
+            return format_html(
+                '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;'
+                'border:1px solid rgba(239,100,100,.24);background:rgba(239,100,100,.12);font-weight:700;color:#b42318;">En retard</span>'
+            )
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;'
+            'border:1px solid rgba(200,248,0,.28);background:rgba(200,248,0,.16);font-weight:700;">Suivi actif</span>'
+        )
+
+    @admin.display(description="Prochaine echeance")
+    def display_next_refresh_due_at(self, obj):
+        return timezone.localtime(obj.next_refresh_due_at).strftime("%d/%m/%Y %H:%M")
+
+    @admin.display(boolean=True, description="En retard")
+    def display_is_overdue(self, obj):
+        return obj.is_overdue
+
+
 @admin.register(SocialLink)
 class SocialLinkAdmin(admin.ModelAdmin):
     ordering = ("sort_order", "pk")
@@ -351,7 +431,7 @@ class SocialLinkAdmin(admin.ModelAdmin):
             badge = "WB"
 
         return format_html(
-            '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:38px;padding:0 10px;border-radius:12px;border:1px solid rgba(53,212,154,.24);background:rgba(53,212,154,.12);font-weight:800;">{}</span>',
+            '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:38px;padding:0 10px;border-radius:12px;border:1px solid rgba(200,248,0,.28);background:rgba(200,248,0,.16);font-weight:800;">{}</span>',
             badge,
         )
 

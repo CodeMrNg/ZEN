@@ -1,8 +1,10 @@
+import calendar
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 CURRENCY_SYMBOLS = {
     'USD': '$',
@@ -12,6 +14,14 @@ CURRENCY_SYMBOLS = {
     'XAF': 'FCFA ',
     'XOF': 'CFA ',
 }
+
+
+def add_calendar_months(value, months=1):
+    month_index = (value.month - 1) + months
+    year = value.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
 
 
 class Trade(models.Model):
@@ -336,6 +346,33 @@ class CapitalMovement(models.Model):
 
     def __str__(self):
         return f'{self.get_kind_display()} {self.amount:,.2f} {self.occurred_at:%Y-%m-%d %H:%M}'
+
+
+class ServerRefreshStatus(models.Model):
+    is_enabled = models.BooleanField(default=True)
+    last_refreshed_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Suivi actualisation serveur'
+        verbose_name_plural = 'Suivi actualisation serveur'
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return 'Suivi actualisation serveur'
+
+    @property
+    def next_refresh_due_at(self):
+        return add_calendar_months(self.last_refreshed_at, months=1)
+
+    @property
+    def is_overdue(self):
+        return self.is_enabled and timezone.now() >= self.next_refresh_due_at
 
 
 class SocialLink(models.Model):

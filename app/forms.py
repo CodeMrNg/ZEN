@@ -28,6 +28,11 @@ def apply_choice_labels(field, labels):
     field.widget.choices = choices
 
 
+def remove_autofocus_from_fields(form):
+    for field in form.fields.values():
+        field.widget.attrs.pop('autofocus', None)
+
+
 class LoginForm(AuthenticationForm):
     username = forms.CharField(
         label='Identifiant',
@@ -304,6 +309,7 @@ class TradingPreferenceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(*args, **kwargs)
+        remove_autofocus_from_fields(self)
         active_account = getattr(self.instance, 'active_account', None)
         if active_account and not self.is_bound:
             self.fields['capital_base'].initial = active_account.capital_base
@@ -358,6 +364,7 @@ class BaseTradingAccountForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(*args, **kwargs)
+        remove_autofocus_from_fields(self)
         self.fields['name'].label = tr(self.language, 'form.account.name', 'Nom du compte')
         self.fields['broker'].label = tr(self.language, 'form.account.broker', 'Broker')
         self.fields['account_identifier'].label = tr(self.language, 'form.account.identifier', 'Numero / identifiant')
@@ -461,6 +468,7 @@ class TradingPasswordChangeForm(PasswordChangeForm):
     def __init__(self, user, *args, **kwargs):
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(user, *args, **kwargs)
+        remove_autofocus_from_fields(self)
         field_config = {
             'old_password': (
                 tr(self.language, 'form.password.current', 'Mot de passe actuel'),
@@ -507,6 +515,7 @@ class DeleteAccountForm(forms.Form):
         self.user = user
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(*args, **kwargs)
+        remove_autofocus_from_fields(self)
         self.fields['password'].label = tr(self.language, 'form.password', 'Mot de passe')
         self.fields['password'].widget.attrs['placeholder'] = tr(
             self.language,

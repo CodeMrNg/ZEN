@@ -8,11 +8,11 @@
     --text: #edf2ff;
     --muted: #8f9bb3;
     --muted-strong: #b8c1d6;
-    --green: #35d49a;
+    --green: #c8f800;
     --red: #ef6464;
-    --amber: #f5be4f;
+    --amber: #d9ff5c;
     --blue: #7ab8ff;
-    --green-soft: rgba(53, 212, 154, 0.12);
+    --green-soft: rgba(200, 248, 0, 0.14);
     --red-soft: rgba(239, 100, 100, 0.14);
     --shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
 }
@@ -29,7 +29,7 @@ body {
 }
 
 html {
-    zoom: 0.8;
+    zoom: 0.9;
 }
 
 body {
@@ -37,7 +37,7 @@ body {
     color: var(--text);
     font-family: "Manrope", sans-serif;
     background:
-        radial-gradient(circle at top left, rgba(53, 212, 154, 0.12), transparent 28%),
+        radial-gradient(circle at top left, rgba(200, 248, 0, 0.14), transparent 28%),
         radial-gradient(circle at top right, rgba(122, 184, 255, 0.08), transparent 24%),
         linear-gradient(180deg, #070a11 0%, #0a0f17 48%, #081019 100%);
 }
@@ -125,8 +125,8 @@ button {
 
 .primary-button {
     color: #06140f;
-    background: linear-gradient(135deg, #72f0bf 0%, #35d49a 55%, #1ea878 100%);
-    box-shadow: 0 18px 28px rgba(53, 212, 154, 0.24);
+    background: linear-gradient(135deg, #f3ff9f 0%, #c8f800 55%, #95bd00 100%);
+    box-shadow: 0 18px 28px rgba(200, 248, 0, 0.24);
 }
 
 .ghost-button {
@@ -143,8 +143,8 @@ button {
 
 .success-button {
     color: #06140f;
-    background: linear-gradient(135deg, #72f0bf 0%, #35d49a 55%, #1ea878 100%);
-    box-shadow: 0 18px 28px rgba(53, 212, 154, 0.24);
+    background: linear-gradient(135deg, #f3ff9f 0%, #c8f800 55%, #95bd00 100%);
+    box-shadow: 0 18px 28px rgba(200, 248, 0, 0.24);
 }
 
 .warning-button {
@@ -235,7 +235,7 @@ button {
     bottom: 8%;
     width: 320px;
     height: 320px;
-    background: radial-gradient(circle, rgba(53, 212, 154, 0.16), transparent 70%);
+    background: radial-gradient(circle, rgba(200, 248, 0, 0.16), transparent 70%);
     animation: auth-ambient-drift-b 28s ease-in-out infinite alternate;
 }
 
@@ -258,7 +258,7 @@ button {
     background:
         linear-gradient(180deg, rgba(10, 18, 28, 0.94), rgba(10, 18, 28, 0.9)),
         radial-gradient(circle at top right, rgba(122, 184, 255, 0.12), transparent 42%),
-        radial-gradient(circle at bottom left, rgba(53, 212, 154, 0.1), transparent 38%);
+        radial-gradient(circle at bottom left, rgba(200, 248, 0, 0.1), transparent 38%);
 }
 
 .auth-hero-inner {
@@ -293,7 +293,7 @@ button {
     height: 360px;
     bottom: -180px;
     left: -70px;
-    background: radial-gradient(circle, rgba(53, 212, 154, 0.18), transparent 70%);
+    background: radial-gradient(circle, rgba(200, 248, 0, 0.18), transparent 70%);
     animation: auth-hero-orbit-b 26s ease-in-out infinite alternate;
 }
 
@@ -572,7 +572,7 @@ button {
     width: 220px;
     height: 220px;
     border-radius: 999px;
-    background: radial-gradient(circle, rgba(53, 212, 154, 0.12), transparent 68%);
+    background: radial-gradient(circle, rgba(200, 248, 0, 0.12), transparent 68%);
     pointer-events: none;
 }
 
@@ -768,9 +768,9 @@ button {
 }
 
 .password-rule.is-met .password-rule-dot {
-    background: rgba(53, 212, 154, 0.92);
-    border-color: rgba(53, 212, 154, 0.92);
-    box-shadow: 0 0 0 4px rgba(53, 212, 154, 0.12);
+    background: rgba(200, 248, 0, 0.92);
+    border-color: rgba(200, 248, 0, 0.92);
+    box-shadow: 0 0 0 4px rgba(200, 248, 0, 0.12);
 }
 
 .password-rule.is-failed {
@@ -870,9 +870,9 @@ button {
 .field-group select:focus,
 .field-group textarea:focus,
 .select-wrap select:focus {
-    border-color: rgba(114, 240, 191, 0.58);
+    border-color: rgba(200, 248, 0, 0.58);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04));
-    box-shadow: 0 0 0 4px rgba(53, 212, 154, 0.08);
+    box-shadow: 0 0 0 4px rgba(200, 248, 0, 0.08);
 }
 
 .field-group textarea {
@@ -902,7 +902,7 @@ button {
     border-radius: 12px;
     padding: 0.72rem 1rem;
     color: #06140f;
-    background: linear-gradient(135deg, #72f0bf 0%, #35d49a 55%, #1ea878 100%);
+    background: linear-gradient(135deg, #f3ff9f 0%, #c8f800 55%, #95bd00 100%);
     font-weight: 800;
     cursor: pointer;
 }
@@ -1031,8 +1031,8 @@ button {
     border: 1px solid rgba(255, 255, 255, 0.08);
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-        url("logo.jpg") center / contain no-repeat;
-    box-shadow: 0 0 32px rgba(53, 212, 154, 0.24);
+        url("logo.png") center / contain no-repeat;
+    box-shadow: 0 0 32px rgba(200, 248, 0, 0.28);
 }
 
 .brand strong {
@@ -1087,7 +1087,7 @@ button {
 
 .nav-item.is-active {
     color: var(--text);
-    background: linear-gradient(135deg, rgba(122, 184, 255, 0.12), rgba(53, 212, 154, 0.12));
+    background: linear-gradient(135deg, rgba(122, 184, 255, 0.12), rgba(200, 248, 0, 0.12));
     border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -1178,7 +1178,7 @@ button {
 .sidebar-social-link[data-platform="WEBSITE"] {
     background:
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.22), transparent 58%),
-        linear-gradient(135deg, rgba(53, 212, 154, 0.38), rgba(24, 110, 84, 0.55));
+        linear-gradient(135deg, rgba(200, 248, 0, 0.38), rgba(24, 110, 84, 0.55));
 }
 
 .sidebar-social-link[data-platform="X"] {
@@ -1321,7 +1321,7 @@ button {
     height: 12px;
     border-radius: 999px;
     background: var(--green);
-    box-shadow: 0 0 20px rgba(53, 212, 154, 0.62);
+    box-shadow: 0 0 20px rgba(200, 248, 0, 0.62);
 }
 
 .select-wrap {
@@ -1347,7 +1347,7 @@ button {
 
 .flash-message.is-success {
     background: var(--green-soft);
-    border-color: rgba(53, 212, 154, 0.3);
+    border-color: rgba(200, 248, 0, 0.3);
     color: #d8ffee;
 }
 
@@ -1355,6 +1355,53 @@ button {
     background: var(--red-soft);
     border-color: rgba(239, 100, 100, 0.3);
     color: #ffd6d6;
+}
+
+.server-refresh-banner {
+    display: grid;
+    gap: 18px;
+    margin-bottom: 16px;
+    background:
+        radial-gradient(circle at top right, rgba(122, 184, 255, 0.14), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(200, 248, 0, 0.12), transparent 30%),
+        rgba(255, 255, 255, 0.03);
+}
+
+.server-refresh-banner.is-overdue {
+    background:
+        radial-gradient(circle at top right, rgba(239, 100, 100, 0.18), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(245, 190, 79, 0.14), transparent 30%),
+        rgba(255, 255, 255, 0.03);
+}
+
+.server-refresh-banner.is-disabled {
+    background:
+        radial-gradient(circle at top right, rgba(143, 155, 179, 0.14), transparent 34%),
+        rgba(255, 255, 255, 0.03);
+}
+
+.server-refresh-copy {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.server-refresh-copy h2 {
+    margin: 6px 0 0;
+    font-size: 1.3rem;
+}
+
+.server-refresh-copy p:last-child {
+    margin: 12px 0 0;
+    color: var(--muted-strong);
+    line-height: 1.7;
+}
+
+.server-refresh-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
 }
 
 .ui-toast {
@@ -1375,7 +1422,7 @@ button {
 }
 
 .ui-toast.is-success {
-    border-color: rgba(53, 212, 154, 0.24);
+    border-color: rgba(200, 248, 0, 0.24);
     background: rgba(8, 26, 19, 0.94);
     color: #d8ffee;
 }
@@ -1461,9 +1508,14 @@ button {
 }
 
 .metric-card-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px;
+}
+
+.metric-card-copy {
+    min-width: 0;
 }
 
 .metric-card-title {
@@ -1473,14 +1525,17 @@ button {
 
 .metric-card-value {
     margin-top: 8px;
-    font-size: 1.9rem;
-    line-height: 1;
+    font-size: clamp(1.45rem, 1.55vw, 1.9rem);
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    overflow-wrap: anywhere;
 }
 
 .metric-card-detail {
     margin-top: 8px;
     color: var(--muted);
     font-size: 0.84rem;
+    overflow-wrap: anywhere;
 }
 
 .metric-progress {
@@ -1503,6 +1558,8 @@ button {
 .metric-ring {
     width: 54px;
     height: 54px;
+    flex: 0 0 54px;
+    align-self: start;
     border-radius: 999px;
     background:
         radial-gradient(circle at center, rgba(12, 16, 24, 1) 58%, transparent 60%),
@@ -1510,7 +1567,7 @@ button {
 }
 
 .metric-card.profit {
-    --tone: #35d49a;
+    --tone: #c8f800;
 }
 
 .metric-card.loss {
@@ -1747,7 +1804,7 @@ button {
 
 .settings-section-accent {
     background:
-        radial-gradient(circle at top right, rgba(53, 212, 154, 0.1), transparent 58%),
+        radial-gradient(circle at top right, rgba(200, 248, 0, 0.1), transparent 58%),
         rgba(255, 255, 255, 0.03);
 }
 
@@ -1788,6 +1845,16 @@ button {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.server-refresh-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.server-refresh-actions form {
+    margin: 0;
+}
+
 .account-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1811,9 +1878,9 @@ button {
 
 .account-card.is-active {
     background:
-        radial-gradient(circle at top right, rgba(53, 212, 154, 0.12), transparent 52%),
+        radial-gradient(circle at top right, rgba(200, 248, 0, 0.12), transparent 52%),
         rgba(255, 255, 255, 0.04);
-    border-color: rgba(53, 212, 154, 0.22);
+    border-color: rgba(200, 248, 0, 0.22);
 }
 
 .account-card.is-archived {
@@ -2511,7 +2578,7 @@ button {
 
 .calendar-cell.is-profit {
     background: linear-gradient(180deg, rgba(32, 111, 82, 0.62), rgba(17, 76, 55, 0.46));
-    border-color: rgba(53, 212, 154, 0.24);
+    border-color: rgba(200, 248, 0, 0.24);
 }
 
 .calendar-cell.is-loss {
@@ -2560,7 +2627,7 @@ button {
 }
 
 .week-summary.profit {
-    background: rgba(53, 212, 154, 0.09);
+    background: rgba(200, 248, 0, 0.09);
 }
 
 .week-summary.loss {
@@ -2651,7 +2718,7 @@ button {
 }
 
 .pnl-pill.profit {
-    background: rgba(53, 212, 154, 0.14);
+    background: rgba(200, 248, 0, 0.14);
     color: #bff9df;
 }
 
@@ -2735,9 +2802,9 @@ button {
 }
 
 .direction-badge.long {
-    background: rgba(53, 212, 154, 0.14);
+    background: rgba(200, 248, 0, 0.14);
     color: #bff9df;
-    border: 1px solid rgba(53, 212, 154, 0.28);
+    border: 1px solid rgba(200, 248, 0, 0.28);
 }
 
 .direction-badge.short {
@@ -2902,8 +2969,8 @@ button {
 }
 
 .movement-item.withdrawal {
-    border-color: rgba(53, 212, 154, 0.18);
-    background: linear-gradient(180deg, rgba(53, 212, 154, 0.08), rgba(255, 255, 255, 0.03));
+    border-color: rgba(200, 248, 0, 0.18);
+    background: linear-gradient(180deg, rgba(200, 248, 0, 0.08), rgba(255, 255, 255, 0.03));
 }
 
 .movement-copy {
@@ -2957,7 +3024,7 @@ button {
 
 .movement-kind.withdrawal {
     color: #d8ffee;
-    background: rgba(53, 212, 154, 0.16);
+    background: rgba(200, 248, 0, 0.16);
 }
 
 .transactions-history-panel {
@@ -3022,8 +3089,8 @@ button {
 
 .history-badge.best {
     color: #d8ffee;
-    background: rgba(53, 212, 154, 0.16);
-    border: 1px solid rgba(53, 212, 154, 0.24);
+    background: rgba(200, 248, 0, 0.16);
+    border: 1px solid rgba(200, 248, 0, 0.24);
 }
 
 .history-badge.worst {
@@ -3043,7 +3110,7 @@ button {
 
 .history-tone.profit {
     color: #d8ffee;
-    background: rgba(53, 212, 154, 0.16);
+    background: rgba(200, 248, 0, 0.16);
 }
 
 .history-tone.loss {
@@ -3360,7 +3427,9 @@ button {
     .trade-modal-header,
     .dashboard-modal-header,
     .detail-hero,
-    .day-trade-item {
+    .day-trade-item,
+    .server-refresh-copy,
+    .server-refresh-actions {
         flex-direction: column;
         align-items: stretch;
     }
@@ -3385,7 +3454,10 @@ button {
     .header-actions a,
     .form-actions > button,
     .form-actions > a,
-    .toolbar .select-wrap {
+    .toolbar .select-wrap,
+    .server-refresh-copy > a,
+    .server-refresh-actions form,
+    .server-refresh-actions button {
         width: 100%;
     }
 
@@ -3713,8 +3785,8 @@ button {
 }
 
 .language-option.is-active {
-    border-color: rgba(53, 212, 154, 0.45);
-    background: rgba(53, 212, 154, 0.12);
+    border-color: rgba(200, 248, 0, 0.45);
+    background: rgba(200, 248, 0, 0.12);
 }
 
 .language-option-copy {
@@ -3754,3 +3826,4 @@ button {
         border-radius: 16px;
     }
 }
+

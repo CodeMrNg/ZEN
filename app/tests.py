@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import CapitalMovement, SocialLink, Trade, TradingAccount, TradingPreference
+from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
 
 
 class DashboardAccessTests(TestCase):
@@ -101,6 +101,67 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['preferences']['default_symbol'], 'XAUUSD')
         self.assertEqual(payload['preferences']['currency'], 'USD')
         self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,095.00')
+        self.assertEqual(len(payload['recent_trades']), 1)
+        self.assertEqual(len(payload['monthly_trades']), 1)
+
+    def test_dashboard_api_limits_recent_trades_to_five_and_exposes_full_month_list(self):
+        account = self.get_active_account()
+        now = timezone.now()
+
+        for index in range(7):
+            Trade.objects.create(
+                user=self.user,
+                account=account,
+                executed_at=now - timedelta(minutes=(6 - index)),
+                symbol='XAUUSD',
+                market='Commodities',
+                direction=Trade.Direction.LONG,
+                result=Trade.Result.TAKE_PROFIT,
+                setup=f'Trade {index + 1}',
+                entry_price=Decimal('1.1000'),
+                rr_ratio=Decimal('1.50'),
+                exit_price=Decimal('1.1000'),
+                quantity=Decimal('1.00'),
+                lot_size=Decimal('1.00'),
+                gp_value=Decimal('100.00'),
+                fees=Decimal('0.00'),
+                risk_amount=Decimal('50.00'),
+                risk_percent=Decimal('0.50'),
+                capital_base=Decimal('10000.00'),
+                confidence=4,
+            )
+
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=now - timedelta(days=40),
+            symbol='NAS100',
+            market='Indices',
+            direction=Trade.Direction.SHORT,
+            result=Trade.Result.STOP_LOSS,
+            setup='Old month trade',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('-1.00'),
+            exit_price=Decimal('1.1000'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('-50.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=Decimal('0.50'),
+            capital_base=Decimal('10000.00'),
+            confidence=3,
+        )
+
+        response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['recent_trades']), 5)
+        self.assertEqual(len(payload['monthly_trades']), 7)
+        self.assertEqual(payload['monthly_trades'][0]['setup'], 'Trade 7')
+        self.assertEqual(payload['recent_trades'][0]['setup'], 'Trade 7')
+        self.assertEqual(payload['recent_trades'][-1]['setup'], 'Trade 3')
 
     def test_language_selection_persists_cookie_and_user_preference(self):
         response = self.client.post(
@@ -329,6 +390,106 @@ class TradingJournalApiTests(TestCase):
         self.assertContains(response, 'id="demo-button"', html=False)
         self.assertContains(response, 'Super admin')
 
+    def test_dashboard_shows_server_refresh_countdown_only_for_super_admin(self):
+        self.get_active_account()
+        ServerRefreshStatus.objects.create(
+            is_enabled=True,
+            last_refreshed_at=timezone.now() - timedelta(days=10),
+        )
+
+        response = self.client.get(reverse('app:dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="server-refresh-countdown"', html=False)
+
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+
+        response = self.client.get(reverse('app:dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="server-refresh-countdown"', html=False)
+        self.assertContains(response, 'Actualisation mensuelle du serveur')
+
+    def test_dashboard_hides_server_refresh_card_when_disabled(self):
+        self.get_active_account()
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        ServerRefreshStatus.objects.create(
+            is_enabled=False,
+            last_refreshed_at=timezone.now() - timedelta(days=10),
+        )
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="server-refresh-countdown"', html=False)
+        self.assertNotContains(response, 'Actualisation mensuelle du serveur')
+
+    def test_settings_view_allows_super_admin_to_refresh_server_countdown(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        server_refresh = ServerRefreshStatus.objects.create(
+            is_enabled=True,
+            last_refreshed_at=timezone.now() - timedelta(days=20),
+        )
+        previous_refresh_at = server_refresh.last_refreshed_at
+
+        response = self.client.post(
+            reverse('app:settings'),
+            data={'action': 'server_refresh_mark_updated'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        server_refresh.refresh_from_db()
+        self.assertTrue(server_refresh.is_enabled)
+        self.assertGreater(server_refresh.last_refreshed_at, previous_refresh_at)
+        self.assertContains(response, 'Le compte a rebours serveur a ete reinitialise pour un mois.')
+
+    def test_settings_view_allows_super_admin_to_disable_and_enable_server_countdown(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        server_refresh = ServerRefreshStatus.objects.create(
+            is_enabled=True,
+            last_refreshed_at=timezone.now() - timedelta(days=12),
+        )
+
+        disable_response = self.client.post(
+            reverse('app:settings'),
+            data={'action': 'server_refresh_disable'},
+        )
+
+        self.assertEqual(disable_response.status_code, 200)
+        server_refresh.refresh_from_db()
+        self.assertFalse(server_refresh.is_enabled)
+        self.assertContains(disable_response, 'Le suivi mensuel du serveur a ete desactive.')
+
+        previous_refresh_at = server_refresh.last_refreshed_at
+        enable_response = self.client.post(
+            reverse('app:settings'),
+            data={'action': 'server_refresh_enable'},
+        )
+
+        self.assertEqual(enable_response.status_code, 200)
+        server_refresh.refresh_from_db()
+        self.assertTrue(server_refresh.is_enabled)
+        self.assertGreater(server_refresh.last_refreshed_at, previous_refresh_at)
+        self.assertContains(enable_response, 'Le suivi mensuel du serveur a ete reactive pour un nouveau cycle.')
+
+    def test_settings_view_rejects_server_refresh_actions_for_non_super_admin(self):
+        server_refresh = ServerRefreshStatus.objects.create(
+            is_enabled=True,
+            last_refreshed_at=timezone.now() - timedelta(days=5),
+        )
+
+        response = self.client.post(
+            reverse('app:settings'),
+            data={'action': 'server_refresh_disable'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        server_refresh.refresh_from_db()
+        self.assertTrue(server_refresh.is_enabled)
+        self.assertContains(response, 'Action reservee au super administrateur.')
+
     def test_transactions_api_returns_monthly_history(self):
         self.create_trade()
         Trade.objects.create(
@@ -497,6 +658,14 @@ class TradingJournalApiTests(TestCase):
         self.assertContains(response, '$10,000.00')
         self.assertContains(response, '+3.95%')
         self.assertContains(response, 'Capital initial')
+
+    def test_settings_view_does_not_autofocus_any_input(self):
+        self.get_active_account()
+
+        response = self.client.get(reverse('app:settings'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'autofocus', html=False)
 
     def test_settings_view_changes_password(self):
         response = self.client.post(

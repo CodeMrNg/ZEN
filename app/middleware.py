@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils import translation
 
 from .localization import normalize_language
 from .services import get_or_create_preferences_for_user
@@ -20,6 +21,8 @@ class UserLanguageMiddleware:
             if request.COOKIES.get(cookie_name) != preferred_language:
                 request.COOKIES[cookie_name] = preferred_language
                 should_sync_cookie = True
+            request.LANGUAGE_CODE = preferred_language
+            translation.activate(preferred_language)
 
         response = self.get_response(request)
 

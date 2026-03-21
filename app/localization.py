@@ -1,36 +1,24 @@
 from django.utils.translation import get_language
 
 DEFAULT_LANGUAGE = "fr"
-RTL_LANGUAGES = {"ar"}
+RTL_LANGUAGES = set()
 
 
 def pack(fr, en, es=None, pt=None, ar=None, zh=None):
     return {
         "fr": fr,
         "en": en,
-        "es": es or en,
-        "pt": pt or en,
-        "ar": ar or en,
-        "zh-hans": zh or en,
     }
 
 
 LANGUAGE_META = {
     "fr": {"native_name": "Francais", "english_name": "French", "locale": "fr-FR"},
     "en": {"native_name": "English", "english_name": "English", "locale": "en-US"},
-    "es": {"native_name": "Espanol", "english_name": "Spanish", "locale": "es-ES"},
-    "pt": {"native_name": "Portugues", "english_name": "Portuguese", "locale": "pt-BR"},
-    "ar": {"native_name": "Arabic", "english_name": "Arabic", "locale": "ar-SA"},
-    "zh-hans": {"native_name": "Chinese", "english_name": "Chinese", "locale": "zh-CN"},
 }
 
 WEEKDAY_SHORT = {
     "fr": ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
     "en": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    "es": ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"],
-    "pt": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
-    "ar": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    "zh-hans": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
 }
 
 TRANSLATIONS = {
@@ -459,12 +447,6 @@ def normalize_language(code):
         "fr-fr": "fr",
         "en-us": "en",
         "en-gb": "en",
-        "es-es": "es",
-        "pt-br": "pt",
-        "pt-pt": "pt",
-        "ar-sa": "ar",
-        "zh": "zh-hans",
-        "zh-cn": "zh-hans",
     }
     normalized = aliases.get(normalized, normalized)
     if normalized in LANGUAGE_META:

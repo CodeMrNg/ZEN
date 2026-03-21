@@ -221,10 +221,6 @@ LANGUAGE_CODE = env("DJANGO_LANGUAGE_CODE", "fr") or "fr"
 LANGUAGES = [
     ("fr", "Francais"),
     ("en", "English"),
-    ("es", "Espanol"),
-    ("pt", "Portugues"),
-    ("ar", "Arabic"),
-    ("zh-hans", "Chinese"),
 ]
 
 TIME_ZONE = env("DJANGO_TIME_ZONE", "Africa/Brazzaville") or "Africa/Brazzaville"

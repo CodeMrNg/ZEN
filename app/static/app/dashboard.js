@@ -35,17 +35,33 @@ if (appNode) {
         dailyTitle: "P&L net quotidien",
         comboTitle: "Vue combinee",
         calendarTitle: "Calendrier de performance",
+        panelDetailTitle: "Vue detaillee",
         positiveDay: "Jour positif",
         negativeDay: "Jour negatif",
         neutralDay: "Neutre",
+        dayTradeCountSuffix: "trade(s)",
+        dayPerformance: "Performance du jour",
+        executions: "Executions",
+        dayExecutionsTitle: "Executions de la journee",
         tradeImage: "Image du trade",
+        screenshotAltPrefix: "Capture",
         dateTime: "Date et heure",
+        setup: "Setup",
         result: "Resultat",
+        netPnl: "P&L net",
+        gpValue: "G/P",
+        ratio: "Ratio",
+        lots: "Lots",
+        capitalPercent: "% capital",
         confidence: "Confiance",
         capitalReference: "Capital de reference",
+        riskAmount: "Montant de risque",
         notes: "Notes",
         noNotes: "Aucune note n a ete renseignee pour ce trade.",
         editTradeButton: "Modifier le trade",
+        chartMissing: "Chart.js n est pas charge. Verifiez le chargement des assets.",
+        tradeSaveFailed: "Le trade n a pas pu etre enregistre.",
+        demoLoadFailed: "Le jeu de donnees de demonstration n a pas pu etre charge.",
         countdownOverdue: "Depasse de",
         countdownDisabled: "Desactive",
         countdownDay: "j",
@@ -84,17 +100,33 @@ if (appNode) {
         dailyTitle: "Daily net P&L",
         comboTitle: "Combined view",
         calendarTitle: "Performance calendar",
+        panelDetailTitle: "Detailed view",
         positiveDay: "Positive day",
         negativeDay: "Negative day",
         neutralDay: "Neutral",
+        dayTradeCountSuffix: "trade(s)",
+        dayPerformance: "Day performance",
+        executions: "Executions",
+        dayExecutionsTitle: "Day executions",
         tradeImage: "Trade image",
+        screenshotAltPrefix: "Screenshot",
         dateTime: "Date and time",
+        setup: "Setup",
         result: "Result",
+        netPnl: "Net P&L",
+        gpValue: "P/L",
+        ratio: "Ratio",
+        lots: "Lots",
+        capitalPercent: "% capital",
         confidence: "Confidence",
         capitalReference: "Reference capital",
+        riskAmount: "Risk amount",
         notes: "Notes",
         noNotes: "No note was provided for this trade.",
         editTradeButton: "Edit trade",
+        chartMissing: "Chart.js is not loaded. Check asset loading.",
+        tradeSaveFailed: "The trade could not be saved.",
+        demoLoadFailed: "The demo dataset could not be loaded.",
         countdownOverdue: "Overdue by",
         countdownDisabled: "Disabled",
         countdownDay: "d",
@@ -829,7 +861,7 @@ if (appNode) {
     function buildTradeCardMarkup(trade) {
         return `
             <button type="button" class="recent-trade recent-trade-button" data-trade-id="${trade.id}">
-                ${trade.screenshot_url ? `<img class="recent-trade-image" src="${trade.screenshot_url}" alt="Capture ${escapeHtml(trade.symbol)}">` : ""}
+                ${trade.screenshot_url ? `<img class="recent-trade-image" src="${trade.screenshot_url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">` : ""}
                 <div class="recent-trade-header">
                     <div class="recent-trade-title">
                         <strong>${escapeHtml(trade.symbol)} | ${escapeHtml(trade.direction)}</strong>
@@ -893,7 +925,7 @@ if (appNode) {
 
     function renderCharts(charts) {
         if (!window.Chart) {
-            showFlash("Chart.js n est pas charge. Verifiez le chargement des assets.", "error");
+            showFlash(strings.chartMissing, "error");
             return;
         }
 
@@ -1093,7 +1125,7 @@ if (appNode) {
                 const toneClass = day.tone === "profit" ? "is-profit" : day.tone === "loss" ? "is-loss" : "";
                 const otherClass = day.in_month ? "" : "is-other";
                 const clickableClass = day.in_month && day.trade_count ? "is-clickable" : "";
-                const subtitle = day.trade_count ? `${day.trade_count} trade(s)` : strings.noExecution;
+                const subtitle = day.trade_count ? `${day.trade_count} ${strings.dayTradeCountSuffix}` : strings.noExecution;
 
                 if (day.in_month && day.trade_count) {
                     return `
@@ -1256,7 +1288,7 @@ if (appNode) {
             calendar: strings.calendarTitle,
         };
 
-        panelModalTitle.textContent = titles[kind] || "Vue detaillee";
+        panelModalTitle.textContent = titles[kind] || strings.panelDetailTitle;
 
         if (kind === "calendar") {
             if (state.expandedPanelChart) {
@@ -1287,7 +1319,7 @@ if (appNode) {
     }
 
     function formatDisplayDate(dateString) {
-        return new Date(`${dateString}T12:00:00`).toLocaleDateString("fr-FR", {
+        return new Date(`${dateString}T12:00:00`).toLocaleDateString(uiLocale, {
             weekday: "long",
             day: "numeric",
             month: "long",
@@ -1307,15 +1339,15 @@ if (appNode) {
         const day = state.calendarDayMap[dateString];
         const trades = state.dayTradeMap[dateString] || [];
         detailModalTitle.textContent = formatDisplayDate(dateString);
-        detailModalSubtitle.textContent = `${day.trade_count} trade(s) | ${day.pnl_formatted}`;
+        detailModalSubtitle.textContent = `${day.trade_count} ${strings.dayTradeCountSuffix} | ${day.pnl_formatted}`;
         detailModalBody.innerHTML = `
             <div class="detail-grid">
                 <article class="detail-card">
-                    <span>Performance du jour</span>
+                    <span>${strings.dayPerformance}</span>
                     <strong>${day.pnl_formatted}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>Executions</span>
+                    <span>${strings.executions}</span>
                     <strong>${day.trade_count}</strong>
                 </article>
                 <article class="detail-card">
@@ -1324,12 +1356,12 @@ if (appNode) {
                 </article>
             </div>
             <section class="detail-section">
-                <h3>Executions de la journee</h3>
+                <h3>${strings.dayExecutionsTitle}</h3>
                 <div class="day-trade-list">
                     ${trades.map((trade) => {
                         return `
                             <button type="button" class="day-trade-item" data-trade-id="${trade.id}">
-                                ${trade.screenshot_url ? `<img class="day-trade-thumb" src="${trade.screenshot_url}" alt="Capture ${escapeHtml(trade.symbol)}">` : ""}
+                                ${trade.screenshot_url ? `<img class="day-trade-thumb" src="${trade.screenshot_url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">` : ""}
                                 <div class="day-trade-main">
                                     <div class="day-trade-topline">
                                         <strong>${escapeHtml(trade.symbol)}</strong>
@@ -1375,7 +1407,7 @@ if (appNode) {
             ${trade.screenshot_url ? `
                 <section class="detail-section">
                     <h3>${strings.tradeImage}</h3>
-                    <img class="detail-image" src="${trade.screenshot_url}" alt="Capture ${escapeHtml(trade.symbol)}">
+                    <img class="detail-image" src="${trade.screenshot_url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">
                 </section>
             ` : ""}
             <div class="detail-grid">
@@ -1384,7 +1416,7 @@ if (appNode) {
                     <strong>${escapeHtml(trade.executed_at_label)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>Setup</span>
+                    <span>${strings.setup}</span>
                     <strong>${escapeHtml(trade.setup)}</strong>
                 </article>
                 <article class="detail-card">
@@ -1392,23 +1424,23 @@ if (appNode) {
                     <strong>${escapeHtml(trade.result_label)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>P&L net</span>
+                    <span>${strings.netPnl}</span>
                     <strong>${escapeHtml(trade.pnl_formatted)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>G/P</span>
+                    <span>${strings.gpValue}</span>
                     <strong>${escapeHtml(trade.gp_value_label)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>Ratio</span>
+                    <span>${strings.ratio}</span>
                     <strong>${escapeHtml(trade.ratio_label)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>Lots</span>
+                    <span>${strings.lots}</span>
                     <strong>${escapeHtml(trade.lot_size_label)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>% capital</span>
+                    <span>${strings.capitalPercent}</span>
                     <strong>${escapeHtml(trade.capital_change_percent_label)}</strong>
                 </article>
                 <article class="detail-card">
@@ -1420,7 +1452,7 @@ if (appNode) {
                     <strong>${escapeHtml(trade.capital_base_formatted)}</strong>
                 </article>
                 <article class="detail-card">
-                    <span>Montant de risque</span>
+                    <span>${strings.riskAmount}</span>
                     <strong>${escapeHtml(trade.risk_amount_formatted)}</strong>
                 </article>
             </div>
@@ -1477,7 +1509,7 @@ if (appNode) {
             const result = await response.json();
 
             if (!response.ok) {
-                const message = flattenErrors(result.errors) || result.message || "Le trade n a pas pu etre enregistre.";
+                const message = flattenErrors(result.errors) || result.message || strings.tradeSaveFailed;
                 throw new Error(message);
             }
 
@@ -1524,7 +1556,7 @@ if (appNode) {
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.message || "Le jeu de donnees de demonstration n a pas pu etre charge.");
+                throw new Error(result.message || strings.demoLoadFailed);
             }
 
             showFlash(result.message, "success");

@@ -19,6 +19,9 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+handler404 = "app.error_views.custom_page_not_found"
+handler500 = "app.error_views.custom_server_error"
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('app.urls')),

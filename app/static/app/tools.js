@@ -4,6 +4,7 @@
         return;
     }
 
+    const langCode = (document.documentElement.lang || "fr").toLowerCase();
     const locale = document.body.dataset.uiLocale || "fr-FR";
     const currencyCode = app.dataset.currencyCode || "USD";
     const toolsModal = document.getElementById("tools-modal");
@@ -13,6 +14,22 @@
     const calculatorHistoryNode = document.getElementById("calculator-history");
     const calculatorDisplayNode = document.getElementById("calculator-display");
     let activeTool = "calculator";
+
+    const strings = langCode.startsWith("fr") ? {
+        calculatorError: "Erreur",
+        toolDefaultTitle: "Outil",
+        toolDefaultCopy: "Execute les calculs de ce module dans le compte actif.",
+        marginUsed: "Marge utilisee: {value} du capital.",
+        ruinNotePositive: "Estimation probabiliste basee sur le win rate, le payoff moyen et le risque par trade.",
+        ruinNoteNegative: "Expectancy negative ou nulle: la probabilite de ruine est consideree comme elevee.",
+    } : {
+        calculatorError: "Error",
+        toolDefaultTitle: "Tool",
+        toolDefaultCopy: "Run calculations for this module using the active account.",
+        marginUsed: "Margin used: {value} of capital.",
+        ruinNotePositive: "Probability estimate based on win rate, average payoff, and risk per trade.",
+        ruinNoteNegative: "Negative or zero expectancy: risk of ruin is considered high.",
+    };
 
     const calculatorState = {
         expression: "",
@@ -73,7 +90,7 @@
 
     function formatCalculatorValue(value) {
         if (!Number.isFinite(value)) {
-            return "Erreur";
+            return strings.calculatorError;
         }
 
         const absoluteValue = Math.abs(value);
@@ -96,8 +113,8 @@
 
     function getToolMeta(toolKey) {
         const panel = toolPanels.find((item) => item.dataset.toolPanel === toolKey) || null;
-        const heading = panel?.querySelector("h2")?.textContent?.trim() || "Outil";
-        const copy = panel?.querySelector(".tool-copy")?.textContent?.trim() || "Execute les calculs de ce module dans le compte actif.";
+        const heading = panel?.querySelector("h2")?.textContent?.trim() || strings.toolDefaultTitle;
+        const copy = panel?.querySelector(".tool-copy")?.textContent?.trim() || strings.toolDefaultCopy;
 
         return {
             panel,
@@ -162,7 +179,7 @@
         }
         if (calculatorDisplayNode) {
             if (calculatorState.hasError) {
-                calculatorDisplayNode.textContent = "Erreur";
+                calculatorDisplayNode.textContent = strings.calculatorError;
                 return;
             }
 
@@ -191,7 +208,7 @@
         calculatorState.history = calculatorState.expression
             ? `${prettifyExpression(calculatorState.expression)} =`
             : "0";
-        calculatorState.display = "Erreur";
+        calculatorState.display = strings.calculatorError;
         calculatorState.justEvaluated = false;
         calculatorState.hasError = true;
         renderCalculator();
@@ -457,7 +474,10 @@
         setText("margin-notional", formatCurrency(notional));
         setText("margin-required", formatCurrency(required));
         setText("margin-free", formatSignedCurrency(capital - required));
-        setText("margin-ratio-note", `Marge utilisee: ${formatPercent(capital > 0 ? (required / capital) * 100 : 0)} du capital.`);
+        setText(
+            "margin-ratio-note",
+            strings.marginUsed.replace("{value}", formatPercent(capital > 0 ? (required / capital) * 100 : 0)),
+        );
     }
 
     function calculatePipValue() {
@@ -567,8 +587,8 @@
         setText(
             "ruin-note",
             expectancy > 0
-                ? "Estimation probabiliste basee sur le win rate, le payoff moyen et le risque par trade."
-                : "Expectancy negative ou nulle: la probabilite de ruine est consideree comme elevee."
+                ? strings.ruinNotePositive
+                : strings.ruinNoteNegative
         );
     }
 

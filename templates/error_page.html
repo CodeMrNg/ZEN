@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="{{ app_language }}" dir="{{ app_language_direction }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} | ZEN TRADING</title>
+    <meta name="description" content="{{ meta_description }}">
+    <link rel="icon" type="image/png" href="{% static 'app/favicon.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'app/favicon.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'app/favicon.png' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'app/dashboard.css' %}">
+</head>
+<body class="auth-body">
+    <div class="auth-shell">
+        <section class="auth-card auth-card-full">
+            <div class="auth-layout">
+                <div class="auth-hero">
+                    <div class="auth-hero-inner">
+                        <div class="brand auth-brand">
+                            <span class="brand-mark"></span>
+                            <div class="auth-brand-copy">
+                                <strong>ZEN TRADING</strong>
+                                <span class="brand-subtitle">{{ brand_subtitle }}</span>
+                            </div>
+                        </div>
+                        <p class="auth-brand-note">{{ brand_note }}</p>
+
+                        <div class="hero-badge">{{ eyebrow }}</div>
+                        <h1>{{ headline }}</h1>
+                        <p class="hero-copy">{{ copy }}</p>
+
+                        <div class="hero-stat-grid">
+                            {% for card in hero_cards %}
+                                <article class="hero-stat-card">
+                                    <span>{{ card.label }}</span>
+                                    <strong>{{ card.value }}</strong>
+                                    <p>{{ card.copy }}</p>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="auth-panel">
+                    <div class="auth-card-panel error-panel">
+                        <div class="auth-card-top">
+                            <div>
+                                <div class="panel-eyebrow">{{ actions_eyebrow }}</div>
+                                <h2>{{ panel_title }}</h2>
+                                <p class="panel-copy">{{ panel_copy }}</p>
+                            </div>
+                            <span class="auth-mode-pill">{{ support_badge }}</span>
+                        </div>
+
+                        <div class="auth-stage-list">
+                            {% for item in guidance_items %}
+                                <article class="auth-stage-item">
+                                    <strong>{{ item.title }}</strong>
+                                    <p>{{ item.copy }}</p>
+                                </article>
+                            {% endfor %}
+                        </div>
+
+                        <div class="error-actions">
+                            <a href="{{ primary_url }}" class="primary-button">{{ primary_label }}</a>
+                            {% if secondary_type == 'reload' %}
+                                <button type="button" class="ghost-button" onclick="window.location.reload()">{{ secondary_label }}</button>
+                            {% elif secondary_url %}
+                                <a href="{{ secondary_url }}" class="ghost-button">{{ secondary_label }}</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

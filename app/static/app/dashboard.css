@@ -665,6 +665,22 @@ button {
     border-left: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.error-panel .auth-stage-list {
+    margin-top: 28px;
+}
+
+.error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.error-actions .primary-button,
+.error-actions .ghost-button {
+    flex: 1 1 220px;
+}
+
 .auth-card-top {
     position: relative;
     z-index: 1;
@@ -992,17 +1008,21 @@ button {
 }
 
 .sidebar {
-    position: sticky;
-    top: 0;
-    display: grid;
-    align-content: start;
+    position: fixed;
+    inset: 0 auto 0 0;
+    display: flex;
+    flex-direction: column;
     gap: 20px;
+    width: 284px;
     min-height: 100vh;
+    height: 100vh;
+    overflow-y: auto;
     padding: 28px 22px;
     border-radius: 0;
     background: linear-gradient(180deg, rgba(13, 17, 27, 0.96) 0%, rgba(9, 12, 18, 0.92) 100%);
     border-right: 1px solid var(--line);
     box-shadow: none;
+    z-index: 20;
 }
 
 .brand {
@@ -1135,10 +1155,47 @@ button {
     gap: 12px;
 }
 
-.sidebar-socials {
+.sidebar-footer {
     margin-top: auto;
+    display: grid;
+    gap: 14px;
+}
+
+.sidebar-socials {
     display: flex;
     gap: 10px;
+}
+
+.sidebar-user-card {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-user-meta {
+    min-width: 0;
+}
+
+.sidebar-user-meta strong,
+.sidebar-user-meta span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-user-meta strong {
+    font-size: 0.96rem;
+}
+
+.sidebar-user-meta span {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 0.84rem;
 }
 
 .sidebar-social-link {
@@ -1260,6 +1317,8 @@ button {
 }
 
 .dashboard-main {
+    grid-column: 2;
+    min-width: 0;
     padding: 26px;
 }
 
@@ -3180,8 +3239,18 @@ button {
         grid-template-columns: 1fr;
     }
 
+    .dashboard-main {
+        grid-column: 1;
+    }
+
     .sidebar {
+        display: grid;
         position: relative;
+        inset: auto;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        z-index: auto;
         grid-template-columns: repeat(12, minmax(0, 1fr));
         align-items: start;
         gap: 16px;
@@ -3193,8 +3262,7 @@ button {
 
     .sidebar > .brand,
     .sidebar > .sidebar-nav,
-    .sidebar > .sidebar-socials,
-    .sidebar > .logout-form {
+    .sidebar > .sidebar-footer {
         grid-column: 1 / -1;
     }
 
@@ -3211,6 +3279,7 @@ button {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .sidebar-footer,
     .logout-form {
         margin-top: 0;
     }
@@ -3408,6 +3477,7 @@ button {
 
     .sidebar-card,
     .sidebar-mini-stats,
+    .sidebar-footer,
     .sidebar-socials,
     .logout-form {
         grid-column: auto;

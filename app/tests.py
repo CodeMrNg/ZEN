@@ -3,12 +3,13 @@ import tempfile
 from datetime import timedelta
 from decimal import Decimal
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from .error_views import custom_page_not_found, custom_server_error
 from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
 
 
@@ -27,6 +28,36 @@ class DashboardAccessTests(TestCase):
         response = self.client.get(reverse('app:tools'))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('app:login'), response.url)
+
+
+class ErrorPageViewTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_custom_404_page_renders_french_content_for_guest(self):
+        request = self.factory.get("/page-introuvable/")
+        request.user = AnonymousUser()
+
+        response = custom_page_not_found(request, Exception("missing"))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("Page introuvable", response.content.decode("utf-8"))
+        self.assertIn(reverse("app:login"), response.content.decode("utf-8"))
+        self.assertIn(reverse("app:register"), response.content.decode("utf-8"))
+
+    def test_custom_500_page_renders_english_content_from_cookie(self):
+        request = self.factory.get("/boom/")
+        request.user = type("AuthenticatedUser", (), {"is_authenticated": True})()
+        request.COOKIES["django_language"] = "en"
+
+        response = custom_server_error(request)
+
+        content = response.content.decode("utf-8")
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("Temporary server issue", content)
+        self.assertIn("Back to dashboard", content)
+        self.assertIn("Reload page", content)
+        self.assertIn('lang="en"', content)
 
 
 class TradingJournalApiTests(TestCase):
@@ -180,6 +211,11 @@ class TradingJournalApiTests(TestCase):
         preferences = TradingPreference.objects.get(user=self.user)
         self.assertEqual(preferences.ui_language, 'en')
 
+        dashboard_response = self.client.get(reverse('app:dashboard'))
+        self.assertContains(dashboard_response, '<html lang="en"', html=False)
+        self.assertContains(dashboard_response, 'Performance dashboard')
+        self.assertNotContains(dashboard_response, 'Dashboard de performance')
+
     def test_authenticated_user_language_is_restored_without_cookie(self):
         TradingPreference.objects.update_or_create(
             user=self.user,
@@ -191,8 +227,19 @@ class TradingJournalApiTests(TestCase):
         response = client.get(reverse('app:dashboard'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '<html lang="es"', html=False)
-        self.assertEqual(response.cookies['django_language'].value, 'es')
+        self.assertContains(response, '<html lang="fr"', html=False)
+        self.assertEqual(response.cookies['django_language'].value, 'fr')
+
+    def test_language_switcher_only_exposes_french_and_english(self):
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="fr"', html=False)
+        self.assertContains(response, 'value="en"', html=False)
+        self.assertNotContains(response, 'value="es"', html=False)
+        self.assertNotContains(response, 'value="pt"', html=False)
+        self.assertNotContains(response, 'value="ar"', html=False)
+        self.assertNotContains(response, 'value="zh-hans"', html=False)
 
     def test_login_keeps_language_selected_before_authentication(self):
         TradingPreference.objects.update_or_create(

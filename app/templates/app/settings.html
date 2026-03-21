@@ -46,12 +46,7 @@
             </div>
         </div>
 
-        {% include 'app/includes/sidebar_social_links.html' %}
-
-        <form action="{% url 'app:logout' %}" method="post" class="logout-form">
-            {% csrf_token %}
-            <button type="submit" class="danger-button button-block" data-loading-text="{% tr 'common.logout_loading' 'Deconnexion...' %}">{% tr 'common.logout' 'Se deconnecter' %}</button>
-        </form>
+        {% include 'app/includes/sidebar_footer.html' %}
     </aside>
 
     <main class="dashboard-main">

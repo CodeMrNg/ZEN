@@ -26,6 +26,12 @@ if (transactionsAppNode) {
         depositPlaceholder: "Ex: apport de capital, alimentation du compte",
         withdrawalCaption: "Le retrait diminue le capital actuel et s integre a l historique mensuel.",
         depositCaption: "Le depot augmente le capital actuel et s integre a l historique mensuel.",
+        movementsPreviewLatest: "2 derniers / {count}",
+        movementsPreviewCount: "{count} transaction(s)",
+        bestMonth: "Meilleur mois",
+        worstMonth: "Mauvais mois",
+        chartMissing: "Chart.js n est pas charge. Verifiez le chargement des assets.",
+        monthlyGp: "G/P mensuel",
     } : {
         loading: "Loading...",
         loadingTransactions: "Loading transactions...",
@@ -49,6 +55,12 @@ if (transactionsAppNode) {
         depositPlaceholder: "Example: capital injection, account funding",
         withdrawalCaption: "The withdrawal reduces current capital and is added to monthly history.",
         depositCaption: "The deposit increases current capital and is added to monthly history.",
+        movementsPreviewLatest: "Latest 2 / {count}",
+        movementsPreviewCount: "{count} transaction(s)",
+        bestMonth: "Best month",
+        worstMonth: "Worst month",
+        chartMissing: "Chart.js is not loaded. Check asset loading.",
+        monthlyGp: "Monthly P/L",
     };
     const setButtonLoading = window.AkiliUI?.setButtonLoading || ((button, isLoading, label) => {
         if (!button) {
@@ -331,7 +343,9 @@ if (transactionsAppNode) {
     function renderMovements(movements) {
         const previewMovements = movements.slice(0, 2);
         const totalCount = movements.length;
-        movementsPreviewBadge.textContent = totalCount > 2 ? `2 derniers / ${totalCount}` : `${totalCount} transaction(s)`;
+        movementsPreviewBadge.textContent = totalCount > 2
+            ? strings.movementsPreviewLatest.replace("{count}", totalCount)
+            : strings.movementsPreviewCount.replace("{count}", totalCount);
         movementsList.innerHTML = buildMovementsMarkup(
             previewMovements,
             strings.noMovements,
@@ -356,8 +370,8 @@ if (transactionsAppNode) {
 
         historyTableBody.innerHTML = rows.map((row) => {
             const badges = [
-                row.is_best_month ? '<span class="history-badge best">Meilleur mois</span>' : "",
-                row.is_worst_month ? '<span class="history-badge worst">Mauvais mois</span>' : "",
+                row.is_best_month ? `<span class="history-badge best">${strings.bestMonth}</span>` : "",
+                row.is_worst_month ? `<span class="history-badge worst">${strings.worstMonth}</span>` : "",
             ].filter(Boolean).join("");
             return `
                 <tr>
@@ -382,7 +396,7 @@ if (transactionsAppNode) {
 
     function renderChart(chart) {
         if (!window.Chart) {
-            showFlash("Chart.js n est pas charge. Verifiez le chargement des assets.", "error");
+            showFlash(strings.chartMissing, "error");
             return;
         }
 
@@ -401,7 +415,7 @@ if (transactionsAppNode) {
             data: {
                 labels: Array.isArray(chart.labels) ? chart.labels : [],
                 datasets: [{
-                    label: "G/P mensuel",
+                    label: strings.monthlyGp,
                     data: values,
                     borderRadius: 14,
                     borderSkipped: false,

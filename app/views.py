@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_GET, require_POST
@@ -99,6 +100,8 @@ def set_language_view(request):
     if request.user.is_authenticated:
         language = persist_request_language_for_user(request, request.user, language=language)
 
+    translation.activate(language)
+    request.LANGUAGE_CODE = language
     response = redirect(next_url)
     return apply_language_cookie(response, language)
 

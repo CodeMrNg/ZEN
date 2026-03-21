@@ -380,6 +380,7 @@ class SocialLink(models.Model):
         WEBSITE = 'WEBSITE', 'Website'
         X = 'X', 'X'
         INSTAGRAM = 'INSTAGRAM', 'Instagram'
+        WHATSAPP = 'WHATSAPP', 'WhatsApp'
         TELEGRAM = 'TELEGRAM', 'Telegram'
         YOUTUBE = 'YOUTUBE', 'YouTube'
         LINKEDIN = 'LINKEDIN', 'LinkedIn'

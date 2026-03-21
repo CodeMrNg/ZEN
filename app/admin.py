@@ -419,6 +419,8 @@ class SocialLinkAdmin(admin.ModelAdmin):
         badge = (obj.platform[:2] if obj.platform != SocialLink.Platform.LINKEDIN else "in").upper()
         if obj.platform == SocialLink.Platform.INSTAGRAM:
             badge = "IG"
+        elif obj.platform == SocialLink.Platform.WHATSAPP:
+            badge = "WA"
         elif obj.platform == SocialLink.Platform.TELEGRAM:
             badge = "TG"
         elif obj.platform == SocialLink.Platform.YOUTUBE:

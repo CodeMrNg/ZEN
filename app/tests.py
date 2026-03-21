@@ -934,6 +934,12 @@ class TradingJournalApiTests(TestCase):
     def test_dashboard_renders_only_three_active_global_social_links(self):
         self.get_active_account()
         SocialLink.objects.create(
+            platform=SocialLink.Platform.WHATSAPP,
+            url='https://wa.me/242000000000',
+            sort_order=0,
+            is_active=True,
+        )
+        SocialLink.objects.create(
             platform=SocialLink.Platform.X,
             url='https://x.com/akili',
             sort_order=1,
@@ -967,9 +973,10 @@ class TradingJournalApiTests(TestCase):
         response = self.client.get(reverse('app:dashboard'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'https://wa.me/242000000000')
         self.assertContains(response, 'https://x.com/akili')
         self.assertContains(response, 'https://t.me/akili')
-        self.assertContains(response, 'https://youtube.com/@akili')
+        self.assertNotContains(response, 'https://youtube.com/@akili')
         self.assertNotContains(response, 'https://linkedin.com/company/akili')
         self.assertNotContains(response, 'https://instagram.com/akili')
 

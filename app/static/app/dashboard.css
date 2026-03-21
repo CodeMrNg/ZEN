@@ -1250,6 +1250,12 @@ button {
         linear-gradient(135deg, rgba(254, 218, 117, 0.82), rgba(250, 126, 30, 0.88) 35%, rgba(214, 41, 118, 0.92) 68%, rgba(79, 91, 213, 0.88));
 }
 
+.sidebar-social-link[data-platform="WHATSAPP"] {
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.2), transparent 58%),
+        linear-gradient(135deg, rgba(64, 219, 124, 0.95), rgba(18, 140, 79, 0.98));
+}
+
 .sidebar-social-link[data-platform="TELEGRAM"] {
     background:
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 58%),

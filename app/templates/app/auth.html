@@ -1,0 +1,173 @@
+{% extends 'app/base.html' %}
+{% load static app_i18n %}
+
+{% block title %}{{ page_title }} | ZEN TRADING{% endblock %}
+{% block meta_description %}{% tr 'auth.meta_description' 'Connectez-vous a ZEN TRADING pour suivre vos comptes, votre capital et vos performances de trading dans un environnement professionnel.' %}{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+    <section class="auth-card auth-card-full">
+        <div class="auth-layout">
+            <div class="auth-hero">
+                <div class="auth-hero-inner">
+                    <div class="brand auth-brand">
+                        <span class="brand-mark"></span>
+                        <div class="auth-brand-copy">
+                            <strong>ZEN TRADING</strong>
+                            <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
+                        </div>
+                    </div>
+                    <p class="auth-brand-note">
+                        {% tr 'auth.brand.note' 'ZEN TRADING centralise votre journal, votre capital et vos outils de pilotage dans un espace de suivi professionnel.' %}
+                    </p>
+
+                    <div class="hero-badge">{% tr 'auth.hero.badge' 'Trading Journal Asynchrone' %}</div>
+                    <h1>{% tr 'auth.hero.title' 'Un journal de trading clair, rapide et structure.' %}</h1>
+                    <p class="hero-copy">
+                        {% tr 'auth.hero.copy' 'Suivez vos comptes, votre capital et vos performances depuis une interface unique.' %}
+                    </p>
+
+                    <div class="hero-stat-grid">
+                        <article class="hero-stat-card">
+                            <span>{% tr 'auth.hero.stat.access' 'Acces' %}</span>
+                            <strong>{% tr 'auth.hero.stat.secure' 'Securise' %}</strong>
+                        </article>
+                        <article class="hero-stat-card">
+                            <span>{% tr 'auth.hero.stat.dashboard' 'Dashboard' %}</span>
+                            <strong>{% tr 'auth.hero.stat.async' 'Asynchrone' %}</strong>
+                        </article>
+                        <article class="hero-stat-card">
+                            <span>{% tr 'auth.hero.stat.monitoring' 'Suivi' %}</span>
+                            <strong>{% tr 'auth.hero.stat.multi_accounts' 'Multi-comptes' %}</strong>
+                        </article>
+                    </div>
+
+                    <div class="hero-tape">
+                        <span>{% tr 'auth.hero.tape.radar' 'Radar de performance' %}</span>
+                        <span>{% tr 'auth.hero.tape.calendar' 'Calendrier mensuel' %}</span>
+                        <span>{% tr 'auth.hero.tape.transactions' 'Transactions de capital' %}</span>
+                    </div>
+
+                    {% if app_social_links %}
+                        <div class="auth-contact-section">
+                            <div class="auth-contact-kicker">{% tr 'auth.social.title' 'Contact rapide' %}</div>
+                            <p class="auth-contact-copy">{% tr 'auth.social.copy' 'Retrouvez nos canaux officiels pour poser une question ou demander une assistance.' %}</p>
+                            {% include 'app/includes/sidebar_social_links.html' %}
+                        </div>
+                    {% endif %}
+
+                    <button type="button" class="primary-button button-block auth-mobile-trigger" data-auth-modal-open>
+                        {% if mode == 'login' %}
+                            {% tr 'auth.mobile.open_login' 'Ouvrir la connexion' %}
+                        {% else %}
+                            {% tr 'auth.mobile.open_register' 'Ouvrir l inscription' %}
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+
+            <div class="auth-panel">
+                <button type="button" class="auth-panel-backdrop" data-auth-modal-close aria-hidden="true"></button>
+                <div class="auth-card-panel">
+                    <div class="auth-card-top">
+                        <div>
+                            <div class="panel-eyebrow">{% if mode == 'login' %}{% tr 'auth.login.eyebrow' 'Connexion' %}{% else %}{% tr 'auth.register.eyebrow' 'Inscription' %}{% endif %}</div>
+                            <h2>{% if mode == 'login' %}{% tr 'auth.login.title' 'Acceder a votre espace' %}{% else %}{% tr 'auth.register.title' 'Creer votre espace' %}{% endif %}</h2>
+                            <p class="panel-copy">
+                                {% if mode == 'login' %}
+                                    {% tr 'auth.login.copy' 'Connectez-vous pour retrouver votre environnement de trading.' %}
+                                {% else %}
+                                    {% tr 'auth.register.copy' 'Creez votre espace pour commencer a journaliser vos executions.' %}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <span class="auth-mode-pill">
+                            {% if mode == 'login' %}{% tr 'auth.login.badge' 'Session protegee' %}{% else %}{% tr 'auth.register.badge' 'Activation immediate' %}{% endif %}
+                        </span>
+                        <button type="button" class="modal-close auth-panel-close" data-auth-modal-close aria-label="{% tr 'auth.mobile.close' 'Fermer le formulaire' %}" hidden>X</button>
+                    </div>
+
+                    {% if form.non_field_errors %}
+                        <div class="form-alert form-alert-error">
+                            {% for error in form.non_field_errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" class="auth-form">
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div class="field-group">
+                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text and mode == 'register' and field.name == 'password1' %}
+                                    <div
+                                        class="password-guidance"
+                                        data-password-guidance
+                                        data-password-input-id="{{ field.id_for_label }}"
+                                        data-username-input-id="{{ form.username.id_for_label }}"
+                                        data-email-input-id="{{ form.email.id_for_label }}"
+                                        data-first-name-input-id="{{ form.first_name.id_for_label }}"
+                                        hidden
+                                    >
+                                        <strong class="password-guidance-title">{% tr 'auth.password.title' 'Exigences du mot de passe' %}</strong>
+                                        <div class="password-guidance-list">
+                                            <div class="password-rule" data-password-rule="length">
+                                                <span class="password-rule-dot" aria-hidden="true"></span>
+                                                <span>{% tr 'auth.password.length' 'Au moins 8 caracteres' %}</span>
+                                            </div>
+                                            <div class="password-rule" data-password-rule="numeric">
+                                                <span class="password-rule-dot" aria-hidden="true"></span>
+                                                <span>{% tr 'auth.password.numeric' 'Ne pas utiliser uniquement des chiffres' %}</span>
+                                            </div>
+                                            <div class="password-rule" data-password-rule="personal">
+                                                <span class="password-rule-dot" aria-hidden="true"></span>
+                                                <span>{% tr 'auth.password.personal' 'Eviter les informations personnelles evidentes' %}</span>
+                                            </div>
+                                            <div class="password-rule" data-password-rule="common">
+                                                <span class="password-rule-dot" aria-hidden="true"></span>
+                                                <span>{% tr 'auth.password.common' 'Eviter les mots de passe trop courants' %}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <small class="field-error">{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+
+                        <button class="primary-button button-block" type="submit" data-loading-text="{% if mode == 'login' %}{% tr 'auth.login.submit' 'Connexion...' %}{% else %}{% tr 'auth.register.submit' 'Creation du compte...' %}{% endif %}">
+                            {% if mode == 'login' %}{% tr 'auth.login.submit' 'Se connecter' %}{% else %}{% tr 'auth.register.submit' 'Creer le compte' %}{% endif %}
+                        </button>
+                    </form>
+
+                    <p class="auth-footer-note">
+                        {% if mode == 'login' %}
+                            {% tr 'auth.login.footer' 'Authentification serveur et ouverture de session securisee.' %}
+                        {% else %}
+                            {% tr 'auth.register.footer' 'L espace est disponible immediatement apres creation du compte.' %}
+                        {% endif %}
+                    </p>
+
+                    <div class="auth-switch">
+                        {% if mode == 'login' %}
+                            <span>{% tr 'auth.login.switch_prompt' 'Vous n avez pas encore de compte ?' %}</span>
+                            <a href="{% url 'app:register' %}">{% tr 'auth.login.switch_link' 'Creer un compte' %}</a>
+                        {% else %}
+                            <span>{% tr 'auth.register.switch_prompt' 'Vous avez deja un compte ?' %}</span>
+                            <a href="{% url 'app:login' %}">{% tr 'auth.register.switch_link' 'Se connecter' %}</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'app/auth.js' %}" defer></script>
+{% endblock %}

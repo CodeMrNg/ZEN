@@ -1,0 +1,753 @@
+﻿{% extends 'app/base.html' %}
+{% load static app_i18n %}
+
+{% block title %}{% tr 'tools.page.title' 'Outils' %} | ZEN TRADING{% endblock %}
+{% block body_class %}dashboard-body{% endblock %}
+
+{% block content %}
+<div
+    class="dashboard-shell"
+    id="tools-app"
+    data-current-capital="{{ current_capital|floatformat:2 }}"
+    data-initial-capital="{{ active_account.capital_base|floatformat:2 }}"
+    data-currency-code="{{ active_account.currency }}"
+>
+    <aside class="sidebar">
+        <button type="button" class="brand brand-trigger" data-ui-modal-open="account-switcher-modal" aria-label="{% tr 'dashboard.switch_account_aria' 'Changer rapidement de compte de trading' %}">
+            <span class="brand-mark"></span>
+            <div>
+                <strong>ZEN TRADING</strong>
+                <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
+                {% if request.user.is_superuser %}
+                    <span class="brand-admin-badge">{% tr 'common.super_admin' 'Super admin' %}</span>
+                {% endif %}
+            </div>
+        </button>
+
+        <nav class="sidebar-nav">
+            <a class="nav-item" href="{% url 'app:dashboard' %}">{% tr 'nav.dashboard' 'Dashboard' %}</a>
+            <a class="nav-item" href="{% url 'app:transactions' %}">{% tr 'nav.transactions' 'Transactions' %}</a>
+            <a class="nav-item is-active" href="{% url 'app:tools' %}">{% tr 'nav.tools' 'Outils' %}</a>
+            <a class="nav-item" href="{% url 'app:settings' %}">{% tr 'nav.settings' 'Parametres' %}</a>
+        </nav>
+
+        <article class="sidebar-card">
+            <span>{% tr 'tools.sidebar.capital' 'Capital actuel' %}</span>
+            <strong>{{ current_capital_formatted }}</strong>
+            <p>{% tr 'tools.sidebar.capital_copy' 'Base de travail du compte actif pour les calculateurs de risque, de marge et de projection.' %}</p>
+        </article>
+
+        <div class="sidebar-mini-stats">
+            <div class="mini-stat">
+                <span>{% tr 'settings.sidebar.active_account' 'Compte actif' %}</span>
+                <strong>{{ active_account.name }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'settings.sidebar.broker' 'Broker' %}</span>
+                <strong>{{ active_account.broker|default:'--' }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'settings.sidebar.currency' 'Devise' %}</span>
+                <strong>{{ active_account.currency }}</strong>
+            </div>
+        </div>
+
+        {% include 'app/includes/sidebar_social_links.html' %}
+
+        <form action="{% url 'app:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="danger-button button-block" data-loading-text="{% tr 'common.logout_loading' 'Deconnexion...' %}">{% tr 'common.logout' 'Se deconnecter' %}</button>
+        </form>
+    </aside>
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div>
+                <p class="eyebrow">{% tr 'tools.header.eyebrow' 'Boite a outils' %}</p>
+                <h1>{% tr 'tools.header.title' 'Outils de trading' %}</h1>
+                <p class="header-copy">{% tr 'tools.header.copy' 'Retrouvez les calculateurs essentiels pour calibrer le risque, dimensionner les positions et projeter le capital depuis le compte actif.' %}</p>
+            </div>
+
+            <div class="header-actions">
+                <span class="form-badge">{{ active_account.name }}</span>
+                <a href="{% url 'app:dashboard' %}" class="ghost-button">{% tr 'tools.back_dashboard' 'Retour au dashboard' %}</a>
+            </div>
+        </header>
+
+        <section class="metrics-grid">
+            <article class="metric-card green">
+                <div class="metric-card-header">
+                    <span class="metric-card-title">{% tr 'tools.metric.current_capital' 'Capital actuel' %}</span>
+                </div>
+                <strong class="metric-card-value">{{ current_capital_formatted }}</strong>
+                <p class="metric-card-detail">{% tr 'tools.metric.current_capital_detail' 'Reference live pour tous les calculateurs' %}</p>
+            </article>
+
+            <article class="metric-card blue">
+                <div class="metric-card-header">
+                    <span class="metric-card-title">{% tr 'tools.metric.risk_one' 'Risque a 1 %' %}</span>
+                </div>
+                <strong class="metric-card-value">{{ risk_one_percent_formatted }}</strong>
+                <p class="metric-card-detail">Base rapide pour le money management.</p>
+            </article>
+
+            <article class="metric-card amber">
+                <div class="metric-card-header">
+                    <span class="metric-card-title">{% tr 'tools.metric.risk_two' 'Risque a 2 %' %}</span>
+                </div>
+                <strong class="metric-card-value">{{ risk_two_percent_formatted }}</strong>
+                <p class="metric-card-detail">Scenario agressif sur le compte actif.</p>
+            </article>
+
+            <article class="metric-card">
+                <div class="metric-card-header">
+                    <span class="metric-card-title">{% tr 'tools.metric.initial_capital' 'Capital initial' %}</span>
+                </div>
+                <strong class="metric-card-value">{{ initial_capital_formatted }}</strong>
+                <p class="metric-card-detail">{% tr 'tools.metric.initial_capital_detail' 'Reference historique du compte actif' %}</p>
+            </article>
+
+            <article class="metric-card">
+                <div class="metric-card-header">
+                    <span class="metric-card-title">{% tr 'tools.metric.currency' 'Devise du compte' %}</span>
+                </div>
+                <strong class="metric-card-value">{{ active_account.currency }}</strong>
+                <p class="metric-card-detail">{% tr 'tools.metric.currency_detail' 'Toutes les sorties monetaires suivent la devise active' %}</p>
+            </article>
+        </section>
+
+        <section class="tools-catalog">
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">01</span>
+                    <div>
+                        <p class="panel-kicker">Calculatrice</p>
+                        <h2>Calculatrice rapide</h2>
+                        <p>Une vraie calculatrice a boutons pour les operations instantanees.</p>
+                    </div>
+                </div>
+                <button type="button" class="primary-button button-block" data-ui-modal-open="tools-modal" data-tool-open="calculator" data-tool-title="Calculatrice rapide" data-tool-copy="Effectue des calculs rapides avec un vrai pave numerique.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">02</span>
+                    <div>
+                        <p class="panel-kicker">Projection</p>
+                        <h2>Calculateur de benefice compose</h2>
+                        <p>Projette la croissance du capital avec rendement mensuel et apports.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="compound" data-tool-title="Calculateur de benefice compose" data-tool-copy="Projette la croissance du capital dans le temps avec rendement compose et contributions.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">03</span>
+                    <div>
+                        <p class="panel-kicker">Risque</p>
+                        <h2>Calculateur de taille de position</h2>
+                        <p>Transforme un risque en % en lots et en unites selon ton stop.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="position" data-tool-title="Calculateur de taille de position" data-tool-copy="Calcule la taille de position optimale a partir du capital, du risque et du stop.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">04</span>
+                    <div>
+                        <p class="panel-kicker">Execution</p>
+                        <h2>Calculateur SL / TP</h2>
+                        <p>Determine automatiquement les niveaux de stop loss et take profit.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="sltp" data-tool-title="Calculateur SL / TP" data-tool-copy="Projette les niveaux de stop et d objectif a partir de l entree et du ratio cible.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">05</span>
+                    <div>
+                        <p class="panel-kicker">Performance</p>
+                        <h2>Calculateur de perte / profit</h2>
+                        <p>Mesure le P&amp;L brut et net d une execution avec frais.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="profit-loss" data-tool-title="Calculateur de perte / profit" data-tool-copy="Mesure le resultat brut, net et en pips d une execution.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">06</span>
+                    <div>
+                        <p class="panel-kicker">Levier</p>
+                        <h2>Calculateur de marge</h2>
+                        <p>Estime la marge requise, la notionnelle et le capital libre.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="margin" data-tool-title="Calculateur de marge" data-tool-copy="Estime la marge necessaire selon le levier, la taille de position et le prix.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">07</span>
+                    <div>
+                        <p class="panel-kicker">Pips</p>
+                        <h2>Calculateur de valeur pip</h2>
+                        <p>Calcule la valeur d un pip dans la devise du compte actif.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="pip" data-tool-title="Calculateur de valeur pip" data-tool-copy="Convertit la valeur d un pip selon la taille du contrat et le taux de conversion.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">08</span>
+                    <div>
+                        <p class="panel-kicker">Niveaux</p>
+                        <h2>Calculateur de Fibonacci</h2>
+                        <p>Affiche les retracements et extensions a partir d un range.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="fibonacci" data-tool-title="Calculateur de Fibonacci" data-tool-copy="Construit les retracements et extensions a partir du point haut et du point bas.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">09</span>
+                    <div>
+                        <p class="panel-kicker">Session</p>
+                        <h2>Calculateur de points de pivot</h2>
+                        <p>Genere les niveaux pivot, supports et resistances de la seance.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="pivot" data-tool-title="Calculateur de points de pivot" data-tool-copy="Calcule les pivots classiques de la seance precedente.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">10</span>
+                    <div>
+                        <p class="panel-kicker">Capital</p>
+                        <h2>Drawdown & risque de ruine</h2>
+                        <p>Mesure la perte relative, la recuperation et le risque de survie.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="drawdown" data-tool-title="Calculateur de drawdown" data-tool-copy="Mesure le drawdown absolu, relatif et la recuperation necessaire.">Ouvrir le drawdown</button>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="ruin" data-tool-title="Calculateur de risque de ruine" data-tool-copy="Estime le risque de ruine a partir du win rate, du payoff et du risque par trade.">Ouvrir le risque de ruine</button>
+            </article>
+        </section>
+
+        <div class="dashboard-modal" id="tools-modal" hidden aria-hidden="true">
+            <div class="dashboard-modal-backdrop" data-ui-modal-close="tools-modal"></div>
+            <section class="dashboard-modal-dialog dashboard-modal-dialog-wide tools-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="tools-modal-title">
+                <div class="dashboard-modal-header">
+                    <div>
+                        <p class="panel-kicker">Outil</p>
+                        <h2 id="tools-modal-title">Calculatrice rapide</h2>
+                        <p class="dashboard-modal-subtitle" id="tools-modal-copy">Choisis un module depuis le catalogue pour ouvrir l'outil correspondant.</p>
+                    </div>
+                    <button type="button" class="modal-close" data-ui-modal-close="tools-modal" aria-label="Fermer l'outil">X</button>
+                </div>
+
+                <div class="dashboard-modal-body">
+                    <section class="tools-grid tools-modal-grid">
+            <article class="panel tool-panel is-active" data-tool-panel="calculator">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Calculatrice</p>
+                        <h2>Calculatrice rapide</h2>
+                    </div>
+                    <span class="form-badge">Arithmetique</span>
+                </div>
+                <p class="tool-copy">Utilise les boutons ou le clavier numerique pour effectuer tes calculs instantanement.</p>
+                <div class="calculator-shell">
+                    <div class="calculator-screen">
+                        <span class="calculator-history" id="calculator-history">0</span>
+                        <strong class="calculator-display" id="calculator-display">0</strong>
+                    </div>
+                    <div class="calculator-keypad">
+                        <button type="button" class="calculator-key is-utility" data-calculator-action="clear">C</button>
+                        <button type="button" class="calculator-key is-utility" data-calculator-action="delete">DEL</button>
+                        <button type="button" class="calculator-key is-operator" data-calculator-value="(">(</button>
+                        <button type="button" class="calculator-key is-operator" data-calculator-value=")">)</button>
+                        <button type="button" class="calculator-key" data-calculator-value="7">7</button>
+                        <button type="button" class="calculator-key" data-calculator-value="8">8</button>
+                        <button type="button" class="calculator-key" data-calculator-value="9">9</button>
+                        <button type="button" class="calculator-key is-operator" data-calculator-value="/">/</button>
+                        <button type="button" class="calculator-key" data-calculator-value="4">4</button>
+                        <button type="button" class="calculator-key" data-calculator-value="5">5</button>
+                        <button type="button" class="calculator-key" data-calculator-value="6">6</button>
+                        <button type="button" class="calculator-key is-operator" data-calculator-value="*">x</button>
+                        <button type="button" class="calculator-key" data-calculator-value="1">1</button>
+                        <button type="button" class="calculator-key" data-calculator-value="2">2</button>
+                        <button type="button" class="calculator-key" data-calculator-value="3">3</button>
+                        <button type="button" class="calculator-key is-operator" data-calculator-value="-">-</button>
+                        <button type="button" class="calculator-key" data-calculator-value="0">0</button>
+                        <button type="button" class="calculator-key" data-calculator-value=".">.</button>
+                        <button type="button" class="calculator-key is-operator" data-calculator-value="+">+</button>
+                        <button type="button" class="calculator-key is-equals" data-calculator-action="evaluate">=</button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="compound">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Projection</p>
+                        <h2>Calculateur de benefice compose</h2>
+                    </div>
+                    <span class="form-badge">Capital</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="compound-capital">Capital initial</label>
+                        <input id="compound-capital" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="compound-return">Rendement par periode (%)</label>
+                        <input id="compound-return" type="number" step="0.01" value="5">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="compound-periods">Periode</label>
+                        <input id="compound-periods" type="number" step="1" value="12">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Capital final</span>
+                        <strong id="compound-final">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Gain cumule</span>
+                        <strong id="compound-profit">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Performance totale</span>
+                        <strong id="compound-growth">--</strong>
+                    </article>
+                </div>
+                <div class="tool-table-wrap">
+                    <table class="tool-table">
+                        <thead>
+                            <tr>
+                                <th>Periode</th>
+                                <th>Capital depart</th>
+                                <th>Gain</th>
+                                <th>Nouveau capital</th>
+                            </tr>
+                        </thead>
+                        <tbody id="compound-breakdown"></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="position">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Risque</p>
+                        <h2>Calculateur de taille de position</h2>
+                    </div>
+                    <span class="form-badge">Sizing</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="position-capital">Capital</label>
+                        <input id="position-capital" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="position-risk">Risque (%)</label>
+                        <input id="position-risk" type="number" step="0.01" value="1">
+                    </div>
+                    <div class="field-group">
+                        <label for="position-stop">Stop (pips)</label>
+                        <input id="position-stop" type="number" step="0.1" value="30">
+                    </div>
+                    <div class="field-group">
+                        <label for="position-pip-value">Valeur d un pip / lot</label>
+                        <input id="position-pip-value" type="number" step="0.01" value="10">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="position-contract">Taille du contrat</label>
+                        <input id="position-contract" type="number" step="1" value="100000">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Montant risque</span>
+                        <strong id="position-risk-amount">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Taille de position</span>
+                        <strong id="position-lots">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Unites</span>
+                        <strong id="position-units">--</strong>
+                    </article>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="sltp">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Execution</p>
+                        <h2>Calculateur SL / TP</h2>
+                    </div>
+                    <span class="form-badge">R:R</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="sltp-direction">Direction</label>
+                        <select id="sltp-direction">
+                            <option value="LONG">Long</option>
+                            <option value="SHORT">Short</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="sltp-entry">Prix d entree</label>
+                        <input id="sltp-entry" type="number" step="0.00001" value="1.1000">
+                    </div>
+                    <div class="field-group">
+                        <label for="sltp-stop-pips">Distance du stop (pips)</label>
+                        <input id="sltp-stop-pips" type="number" step="0.1" value="25">
+                    </div>
+                    <div class="field-group">
+                        <label for="sltp-rr">Ratio cible</label>
+                        <input id="sltp-rr" type="number" step="0.01" value="2">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="sltp-pip-size">Taille d un pip</label>
+                        <input id="sltp-pip-size" type="number" step="0.00001" value="0.0001">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Stop loss</span>
+                        <strong id="sltp-stop-price">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Take profit</span>
+                        <strong id="sltp-target-price">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Distance TP (pips)</span>
+                        <strong id="sltp-target-pips">--</strong>
+                    </article>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="profit-loss">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Performance</p>
+                        <h2>Calculateur de perte / profit</h2>
+                    </div>
+                    <span class="form-badge">P&amp;L</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="pl-direction">Direction</label>
+                        <select id="pl-direction">
+                            <option value="LONG">Long</option>
+                            <option value="SHORT">Short</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="pl-entry">Prix d entree</label>
+                        <input id="pl-entry" type="number" step="0.00001" value="1.1000">
+                    </div>
+                    <div class="field-group">
+                        <label for="pl-exit">Prix de sortie</label>
+                        <input id="pl-exit" type="number" step="0.00001" value="1.1050">
+                    </div>
+                    <div class="field-group">
+                        <label for="pl-lots">Quantite (lots)</label>
+                        <input id="pl-lots" type="number" step="0.01" value="1">
+                    </div>
+                    <div class="field-group">
+                        <label for="pl-contract">Taille du contrat</label>
+                        <input id="pl-contract" type="number" step="1" value="100000">
+                    </div>
+                    <div class="field-group">
+                        <label for="pl-pip-size">Taille d un pip</label>
+                        <input id="pl-pip-size" type="number" step="0.00001" value="0.0001">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="pl-fees">Frais</label>
+                        <input id="pl-fees" type="number" step="0.01" value="0">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Variation (pips)</span>
+                        <strong id="pl-pips">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>P&amp;L brut</span>
+                        <strong id="pl-gross">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>P&amp;L net</span>
+                        <strong id="pl-net">--</strong>
+                    </article>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="margin">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Levier</p>
+                        <h2>Calculateur de marge</h2>
+                    </div>
+                    <span class="form-badge">Margin</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="margin-capital">Capital</label>
+                        <input id="margin-capital" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="margin-price">Prix de l actif</label>
+                        <input id="margin-price" type="number" step="0.00001" value="1.1000">
+                    </div>
+                    <div class="field-group">
+                        <label for="margin-lots">Quantite (lots)</label>
+                        <input id="margin-lots" type="number" step="0.01" value="1">
+                    </div>
+                    <div class="field-group">
+                        <label for="margin-contract">Taille du contrat</label>
+                        <input id="margin-contract" type="number" step="1" value="100000">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="margin-leverage">Levier</label>
+                        <input id="margin-leverage" type="number" step="1" value="100">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Valeur notionnelle</span>
+                        <strong id="margin-notional">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Marge requise</span>
+                        <strong id="margin-required">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Capital libre</span>
+                        <strong id="margin-free">--</strong>
+                    </article>
+                </div>
+                <p class="tool-note" id="margin-ratio-note">--</p>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="pip">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Pips</p>
+                        <h2>Calculateur de valeur pip</h2>
+                    </div>
+                    <span class="form-badge">Pip</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="pip-lots">Quantite (lots)</label>
+                        <input id="pip-lots" type="number" step="0.01" value="1">
+                    </div>
+                    <div class="field-group">
+                        <label for="pip-contract">Taille du contrat</label>
+                        <input id="pip-contract" type="number" step="1" value="100000">
+                    </div>
+                    <div class="field-group">
+                        <label for="pip-size">Taille d un pip</label>
+                        <input id="pip-size" type="number" step="0.00001" value="0.0001">
+                    </div>
+                    <div class="field-group">
+                        <label for="pip-conversion">Taux conversion devise cotee -> compte</label>
+                        <input id="pip-conversion" type="number" step="0.0001" value="1">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Valeur pip brute</span>
+                        <strong id="pip-quote-value">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Valeur pip compte</span>
+                        <strong id="pip-account-value">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Valeur / 10 pips</span>
+                        <strong id="pip-ten-value">--</strong>
+                    </article>
+                </div>
+            </article>
+
+            <article class="panel tool-panel is-wide" data-tool-panel="fibonacci">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Niveaux</p>
+                        <h2>Calculateur de Fibonacci</h2>
+                    </div>
+                    <span class="form-badge">Retracements</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="fibo-direction">Sens de marche</label>
+                        <select id="fibo-direction">
+                            <option value="bullish">Hausse</option>
+                            <option value="bearish">Baisse</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="fibo-high">Point haut</label>
+                        <input id="fibo-high" type="number" step="0.00001" value="1.1250">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="fibo-low">Point bas</label>
+                        <input id="fibo-low" type="number" step="0.00001" value="1.1000">
+                    </div>
+                </div>
+                <div class="tool-levels-grid">
+                    <div class="tool-levels-card">
+                        <strong>Retracements</strong>
+                        <div class="tool-level-list" id="fibo-retracements"></div>
+                    </div>
+                    <div class="tool-levels-card">
+                        <strong>Extensions</strong>
+                        <div class="tool-level-list" id="fibo-extensions"></div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="panel tool-panel is-wide" data-tool-panel="pivot">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Session</p>
+                        <h2>Calculateur de points de pivot</h2>
+                    </div>
+                    <span class="form-badge">Pivot</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="pivot-high">High</label>
+                        <input id="pivot-high" type="number" step="0.00001" value="1.1250">
+                    </div>
+                    <div class="field-group">
+                        <label for="pivot-low">Low</label>
+                        <input id="pivot-low" type="number" step="0.00001" value="1.1050">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="pivot-close">Close</label>
+                        <input id="pivot-close" type="number" step="0.00001" value="1.1180">
+                    </div>
+                </div>
+                <div class="tool-table-wrap">
+                    <table class="tool-table">
+                        <thead>
+                            <tr>
+                                <th>Niveau</th>
+                                <th>Valeur</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pivot-levels"></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="drawdown">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Capital</p>
+                        <h2>Calculateur de drawdown</h2>
+                    </div>
+                    <span class="form-badge">DD</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="drawdown-peak">Capital au sommet</label>
+                        <input id="drawdown-peak" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                    </div>
+                    <div class="field-group">
+                        <label for="drawdown-current">Capital actuel</label>
+                        <input id="drawdown-current" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Perte absolue</span>
+                        <strong id="drawdown-amount">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Drawdown (%)</span>
+                        <strong id="drawdown-percent">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Recuperation requise</span>
+                        <strong id="drawdown-recovery">--</strong>
+                    </article>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="ruin">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Survie</p>
+                        <h2>Calculateur de risque de ruine</h2>
+                    </div>
+                    <span class="form-badge">Probabilite</span>
+                </div>
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="ruin-win-rate">Taux de reussite (%)</label>
+                        <input id="ruin-win-rate" type="number" step="0.01" value="45">
+                    </div>
+                    <div class="field-group">
+                        <label for="ruin-avg-win">Gain moyen (R)</label>
+                        <input id="ruin-avg-win" type="number" step="0.01" value="2">
+                    </div>
+                    <div class="field-group">
+                        <label for="ruin-avg-loss">Perte moyenne (R)</label>
+                        <input id="ruin-avg-loss" type="number" step="0.01" value="1">
+                    </div>
+                    <div class="field-group">
+                        <label for="ruin-risk-trade">Risque par trade (%)</label>
+                        <input id="ruin-risk-trade" type="number" step="0.01" value="1">
+                    </div>
+                    <div class="field-group field-span-2">
+                        <label for="ruin-max-dd">Drawdown maximal tolere (%)</label>
+                        <input id="ruin-max-dd" type="number" step="0.01" value="30">
+                    </div>
+                </div>
+                <div class="tool-result-grid">
+                    <article class="detail-card">
+                        <span>Expectancy</span>
+                        <strong id="ruin-expectancy">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Capital en unites de risque</span>
+                        <strong id="ruin-capital-units">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>Risque de ruine estime</span>
+                        <strong id="ruin-risk">--</strong>
+                    </article>
+                </div>
+                <p class="tool-note" id="ruin-note">--</p>
+            </article>
+                    </section>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    {% include 'app/includes/account_switcher.html' %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'app/tools.js' %}" defer></script>
+{% endblock %}
+

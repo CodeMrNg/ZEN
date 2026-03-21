@@ -1,0 +1,65 @@
+{% load app_i18n %}
+<div
+    class="dashboard-modal account-switcher-modal"
+    id="account-switcher-modal"
+    hidden
+    aria-hidden="true"
+    data-switch-account-modal
+    data-switch-account-url="{% url 'app:account-switch' %}"
+>
+    <div class="dashboard-modal-backdrop" data-ui-modal-close="account-switcher-modal"></div>
+    <section class="dashboard-modal-dialog dashboard-modal-dialog-detail" role="dialog" aria-modal="true" aria-labelledby="account-switcher-title">
+            <div class="dashboard-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'settings.accounts.kicker' 'Comptes' %}</p>
+                    <h2 id="account-switcher-title">{% tr 'switcher.title' 'Changer de compte' %}</h2>
+                    <p class="dashboard-modal-subtitle">
+                        {% tr 'switcher.subtitle' 'Selectionnez rapidement un autre compte de trading depuis cette fenetre.' %}
+                    </p>
+                </div>
+            <button type="button" class="modal-close" data-ui-modal-close="account-switcher-modal" aria-label="{% tr 'common.close_account_switch' 'Fermer le changement de compte' %}">X</button>
+        </div>
+
+        <div class="dashboard-modal-body">
+            <div class="account-list account-list-switcher">
+                {% for account in trading_accounts %}
+                    <article class="account-card {% if active_account and account.id == active_account.id %}is-active{% endif %}">
+                        <div class="account-card-copy">
+                            <strong>{{ account.name }}</strong>
+                            <span>{% if account.broker %}{{ account.broker }}{% else %}{% tr 'common.broker_missing' 'Broker non renseigne' %}{% endif %}</span>
+                            <small>
+                                {{ account.currency_symbol }}{{ account.capital_base|floatformat:2 }}
+                                {% if account.account_identifier %} | {{ account.account_identifier }}{% endif %}
+                            </small>
+                        </div>
+                        <div class="account-card-meta">
+                            {% if active_account and account.id == active_account.id %}
+                                <span class="score-pill">{% tr 'settings.account.active_badge' 'Actif' %}</span>
+                            {% else %}
+                                <button
+                                    type="button"
+                                    class="ghost-button"
+                                    data-account-switch-button
+                                    data-account-id="{{ account.id }}"
+                                    data-loading-text="{% tr 'settings.account.activate_loading' 'Activation...' %}"
+                                >
+                                    {% tr 'settings.account.activate' 'Activer' %}
+                                </button>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+            <div class="account-switcher-actions">
+                {% if request.resolver_match.url_name == 'settings' %}
+                    <button type="button" class="primary-button button-block" data-ui-modal-open="account-create-modal">
+                        {% tr 'settings.accounts.add' 'Ajouter un compte' %}
+                    </button>
+                {% else %}
+                    <a href="{% url 'app:settings' %}" class="ghost-button button-block">{% tr 'switcher.manage_accounts' 'Gerer les comptes' %}</a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</div>

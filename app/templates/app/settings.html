@@ -1,0 +1,669 @@
+{% extends 'app/base.html' %}
+{% load app_i18n %}
+
+{% block title %}{% tr 'settings.page.title' 'Parametres' %} | ZEN TRADING{% endblock %}
+{% block body_class %}dashboard-body{% endblock %}
+
+{% block content %}
+<div class="dashboard-shell settings-shell">
+    <aside class="sidebar">
+        <button type="button" class="brand brand-trigger" data-ui-modal-open="account-switcher-modal" aria-label="{% tr 'dashboard.switch_account_aria' 'Changer rapidement de compte de trading' %}">
+            <span class="brand-mark"></span>
+            <div>
+                <strong>ZEN TRADING</strong>
+                <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
+                {% if request.user.is_superuser %}
+                    <span class="brand-admin-badge">{% tr 'common.super_admin' 'Super admin' %}</span>
+                {% endif %}
+            </div>
+        </button>
+
+        <nav class="sidebar-nav">
+            <a class="nav-item" href="{% url 'app:dashboard' %}">{% tr 'nav.dashboard' 'Dashboard' %}</a>
+            <a class="nav-item" href="{% url 'app:transactions' %}">{% tr 'nav.transactions' 'Transactions' %}</a>
+            <a class="nav-item" href="{% url 'app:tools' %}">{% tr 'nav.tools' 'Outils' %}</a>
+            <a class="nav-item is-active" href="{% url 'app:settings' %}">{% tr 'nav.settings' 'Parametres' %}</a>
+        </nav>
+
+        <article class="sidebar-card">
+            <span>{% tr 'settings.sidebar.capital' 'Capital actif' %}</span>
+            <strong>{{ current_capital_formatted }}</strong>
+            <p>{% tr 'settings.sidebar.capital_copy' 'Capital consolide du compte actif, calcule a partir des trades et des mouvements de capital.' %}</p>
+        </article>
+
+        <div class="sidebar-mini-stats">
+            <div class="mini-stat">
+                <span>{% tr 'settings.sidebar.active_account' 'Compte actif' %}</span>
+                <strong>{{ active_account.name }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'settings.sidebar.broker' 'Broker' %}</span>
+                <strong>{{ active_account.broker|default:'--' }}</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'settings.sidebar.currency' 'Devise' %}</span>
+                <strong>{{ active_account.currency }}</strong>
+            </div>
+        </div>
+
+        {% include 'app/includes/sidebar_social_links.html' %}
+
+        <form action="{% url 'app:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="danger-button button-block" data-loading-text="{% tr 'common.logout_loading' 'Deconnexion...' %}">{% tr 'common.logout' 'Se deconnecter' %}</button>
+        </form>
+    </aside>
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div>
+                <p class="eyebrow">{% tr 'settings.header.eyebrow' 'Configuration' %}</p>
+                <h1>{% tr 'settings.header.title' 'Parametres de trading' %}</h1>
+                <p class="header-copy">
+                    {% tr 'settings.header.copy' 'Centralisez les parametres du compte actif, les valeurs de saisie par defaut et les options de securite. Le capital actuel reste dynamique, tandis que le capital initial demeure la reference historique.' %}
+                </p>
+            </div>
+
+            <div class="header-actions">
+                <a href="{% url 'app:dashboard' %}" class="ghost-button">{% tr 'settings.back_dashboard' 'Retour au dashboard' %}</a>
+            </div>
+        </header>
+
+        {% if success_message %}
+            <div class="flash-message is-success">{{ success_message }}</div>
+        {% endif %}
+
+        {% if error_message %}
+            <div class="flash-message is-error">{{ error_message }}</div>
+        {% endif %}
+
+        {% if preferences_form.non_field_errors %}
+            <div class="flash-message is-error">
+                {{ preferences_form.non_field_errors|join:', ' }}
+            </div>
+        {% endif %}
+
+        {% if account_form.non_field_errors %}
+            <div class="flash-message is-error">
+                {{ account_form.non_field_errors|join:', ' }}
+            </div>
+        {% endif %}
+
+        {% if password_form.non_field_errors %}
+            <div class="flash-message is-error">
+                {{ password_form.non_field_errors|join:', ' }}
+            </div>
+        {% endif %}
+
+        {% if delete_account_form.non_field_errors %}
+            <div class="flash-message is-error">
+                {{ delete_account_form.non_field_errors|join:', ' }}
+            </div>
+        {% endif %}
+
+        <section class="dashboard-grid settings-grid">
+            <article class="panel settings-panel-accounts">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'settings.accounts.kicker' 'Comptes' %}</p>
+                        <h2>{% tr 'settings.accounts.title' 'Comptes de trading' %}</h2>
+                    </div>
+                    <div class="panel-actions">
+                        <span class="form-badge">{{ trading_accounts|length }} {% tr 'settings.accounts.count_suffix' 'compte(s)' %}</span>
+                        <button
+                            type="button"
+                            class="panel-expand"
+                            data-ui-modal-open="archived-accounts-modal"
+                            aria-label="{% tr 'settings.accounts.show_archived' 'Afficher les comptes archives' %}"
+                            title="{% tr 'settings.accounts.archived_title' 'Comptes archives' %}"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 7h16M7 4h10M6 7v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7M10 11h4"></path>
+                            </svg>
+                        </button>
+                        <button type="button" class="primary-button" data-ui-modal-open="account-create-modal">{% tr 'settings.accounts.add' 'Ajouter un compte' %}</button>
+                    </div>
+                </div>
+
+                <section class="settings-section">
+                    <div class="settings-section-copy">
+                        <h3>{% tr 'settings.accounts.section_title' 'Compte actif' %}</h3>
+                        <p>
+                            {% tr 'settings.accounts.section_copy' 'Un meme utilisateur peut administrer plusieurs comptes de trading. Selectionnez ici le compte actif utilise dans le dashboard et le module Transactions.' %}
+                        </p>
+                    </div>
+
+                    <div class="account-list">
+                        {% for account in trading_accounts %}
+                            <article class="account-card {% if active_account and account.id == active_account.id %}is-active{% endif %}">
+                                <div class="account-card-copy">
+                                    <div class="account-card-headline">
+                                        <strong>{{ account.name }}</strong>
+                                        {% if active_account and account.id == active_account.id %}
+                                            <span class="score-pill">{% tr 'settings.account.active_badge' 'Actif' %}</span>
+                                        {% endif %}
+                                    </div>
+                                    <span>{{ account.broker|default:'Broker non renseigne' }}</span>
+                                    <div class="account-card-stats">
+                                        <span class="detail-meta-pill">{{ account.currency_symbol }}{{ account.capital_base|floatformat:2 }}</span>
+                                        {% if account.account_identifier %}
+                                            <span class="detail-meta-pill">{{ account.account_identifier }}</span>
+                                        {% endif %}
+                                        <span class="detail-meta-pill">{% tr 'settings.account.created_on' 'Cree le {date}' date=account.created_at|date:'d/m/Y' %}</span>
+                                    </div>
+                                </div>
+                                <div class="account-card-meta">
+                                    <button
+                                        type="button"
+                                        class="ghost-button"
+                                        data-account-edit-button
+                                        data-ui-modal-open="account-edit-modal"
+                                        data-account-id="{{ account.id }}"
+                                        data-account-name="{{ account.name }}"
+                                        data-account-broker="{{ account.broker }}"
+                                        data-account-identifier="{{ account.account_identifier }}"
+                                        data-account-capital="{{ account.capital_base }}"
+                                        data-account-currency="{{ account.currency }}"
+                                        data-account-active="{% if active_account and account.id == active_account.id %}true{% else %}false{% endif %}"
+                                    >
+                                        {% tr 'settings.account.edit' 'Modifier' %}
+                                    </button>
+                                    {% if not active_account or account.id != active_account.id %}
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="activate_account">
+                                            <input type="hidden" name="account_id" value="{{ account.id }}">
+                                            <button type="submit" class="ghost-button" data-loading-text="{% tr 'settings.account.activate_loading' 'Activation...' %}">{% tr 'settings.account.activate' 'Activer' %}</button>
+                                        </form>
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="archive_account">
+                                            <input type="hidden" name="account_id" value="{{ account.id }}">
+                                            <button
+                                                type="submit"
+                                                class="danger-button"
+                                                data-loading-text="{% tr 'settings.account.archive_loading' 'Archivage...' %}"
+                                                data-confirm-message="{% tr 'settings.account.archive_confirm' 'Archiver ce compte de trading ?' %}"
+                                            >
+                                                {% tr 'settings.account.archive' 'Archiver' %}
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+            </article>
+
+            <article class="panel settings-panel-main">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'settings.section.base' 'Base' %}</p>
+                        <h2>{% tr 'settings.section.defaults' 'Valeurs par defaut' %}</h2>
+                    </div>
+                    <span class="form-badge">{{ active_account.name }}</span>
+                </div>
+
+                <form method="post" class="trade-form settings-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="preferences">
+
+                    <div class="settings-section">
+                    <div class="settings-section-copy">
+                        <h3>{% tr 'settings.section.entry_profile' 'Profil de saisie' %}</h3>
+                        <p>
+                            {% tr 'settings.section.entry_profile_copy' 'Ces parametres alimentent automatiquement le formulaire Nouveau trade afin de standardiser la saisie.' %}
+                        </p>
+                    </div>
+
+                        <div class="form-grid">
+                            <div class="field-group">
+                                <label for="{{ preferences_form.default_symbol.id_for_label }}">{{ preferences_form.default_symbol.label }}</label>
+                                {{ preferences_form.default_symbol }}
+                                {% for error in preferences_form.default_symbol.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ preferences_form.default_direction.id_for_label }}">{{ preferences_form.default_direction.label }}</label>
+                                {{ preferences_form.default_direction }}
+                                {% for error in preferences_form.default_direction.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group field-span-2">
+                                <label for="{{ preferences_form.default_setup.id_for_label }}">{{ preferences_form.default_setup.label }}</label>
+                                {{ preferences_form.default_setup }}
+                                {% for error in preferences_form.default_setup.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ preferences_form.default_lot_size.id_for_label }}">{{ preferences_form.default_lot_size.label }}</label>
+                                {{ preferences_form.default_lot_size }}
+                                {% for error in preferences_form.default_lot_size.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ preferences_form.default_fees.id_for_label }}">{{ preferences_form.default_fees.label }}</label>
+                                {{ preferences_form.default_fees }}
+                                {% for error in preferences_form.default_fees.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ preferences_form.default_confidence.id_for_label }}">{{ preferences_form.default_confidence.label }}</label>
+                                {{ preferences_form.default_confidence }}
+                                {% for error in preferences_form.default_confidence.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ preferences_form.currency.id_for_label }}">{{ preferences_form.currency.label }}</label>
+                                {{ preferences_form.currency }}
+                                {% for error in preferences_form.currency.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section settings-section-accent">
+                        <div class="settings-section-copy">
+                            <h3>{% tr 'form.preferences.active_initial_capital' 'Capital initial du compte actif' %}</h3>
+                            <p>
+                                {% tr 'settings.section.capital_copy' 'Le capital actuel evolue avec l activite du compte. Le capital initial reste la base de reference pour l analyse historique.' %}
+                            </p>
+                        </div>
+
+                        <div class="settings-summary settings-summary-compact">
+                            <article class="detail-card">
+                                <span>{% tr 'settings.section.account_capital' 'Capital du compte' %}</span>
+                                <strong>{{ current_capital_formatted }}</strong>
+                            </article>
+                            <article class="detail-card">
+                                <span>{% tr 'settings.section.initial_capital' 'Capital initial' %}</span>
+                                <strong>{{ initial_capital_formatted }}</strong>
+                            </article>
+                            <article class="detail-card">
+                                <span>{% tr 'settings.section.initial_gp' 'G/P sur capital initial' %}</span>
+                                <strong class="settings-gp-value {{ initial_capital_gp_tone }}">{{ initial_capital_gp_percent_label }}</strong>
+                            </article>
+                        </div>
+
+                        <div class="form-grid settings-capital-grid">
+                            <div class="field-group">
+                                <label for="{{ preferences_form.capital_base.id_for_label }}">{{ preferences_form.capital_base.label }}</label>
+                                {{ preferences_form.capital_base }}
+                                <small class="field-help">
+                                    {% tr 'settings.section.capital_hint' 'Exemple : avec 1 % de risque et un capital initial de 10 000, l exposition de reference est de 100 dans la devise du compte.' %}
+                                </small>
+                                {% for error in preferences_form.capital_base.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                        <div class="form-actions">
+                            <p class="form-caption">{% tr 'settings.section.defaults_caption' 'Les prochaines saisies utiliseront cette configuration par defaut.' %}</p>
+                            <button type="submit" class="primary-button" data-loading-text="{% tr 'settings.section.save_loading' 'Enregistrement...' %}">{% tr 'settings.section.save' 'Enregistrer les parametres' %}</button>
+                        </div>
+                    </form>
+                </article>
+
+            <article class="panel settings-panel-side">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'settings.section.summary' 'Synthese' %}</p>
+                        <h2>{% tr 'settings.section.operational_impact' 'Impact operationnel' %}</h2>
+                    </div>
+                </div>
+
+                <div class="settings-summary">
+                    <article class="detail-card">
+                        <span>{% tr 'settings.section.default_direction' 'Direction par defaut' %}</span>
+                        <strong>{{ preferences.get_default_direction_display }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'settings.section.default_lots' 'Lots par defaut' %}</span>
+                        <strong>{{ preferences.default_lot_size|floatformat:2 }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'settings.section.default_gp' 'G/P par defaut' %}</span>
+                        <strong>{{ preferences.default_fees|floatformat:2 }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'settings.section.default_confidence' 'Confiance par defaut' %}</span>
+                        <strong>{{ preferences.default_confidence }}/5</strong>
+                    </article>
+                </div>
+
+                <section class="detail-section">
+                    <h3>{% tr 'settings.section.effects' 'Effets de configuration' %}</h3>
+                    <p>
+                        {% tr 'settings.section.effects_copy_one' 'Les champs preconfigures sont injectes dans la modale Nouveau trade pour accelerer la saisie et uniformiser les enregistrements.' %}
+                    </p>
+                    <p>
+                        {% tr 'settings.section.effects_copy_two' 'Le capital actuel reflete l etat du compte en temps reel. Le capital initial reste disponible pour mesurer la performance depuis l origine.' %}
+                    </p>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-copy">
+                        <h3>{% tr 'settings.section.security' 'Securite' %}</h3>
+                        <p>
+                            {% tr 'settings.section.security_copy' 'Mettez a jour les identifiants de connexion sans interrompre la session en cours.' %}
+                        </p>
+                    </div>
+
+                    <form method="post" class="trade-form settings-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="password">
+
+                        <div class="form-grid">
+                            <div class="field-group field-span-2">
+                                <label for="{{ password_form.old_password.id_for_label }}">{{ password_form.old_password.label }}</label>
+                                {{ password_form.old_password }}
+                                {% for error in password_form.old_password.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ password_form.new_password1.id_for_label }}">{{ password_form.new_password1.label }}</label>
+                                {{ password_form.new_password1 }}
+                                {% for error in password_form.new_password1.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
+                                <label for="{{ password_form.new_password2.id_for_label }}">{{ password_form.new_password2.label }}</label>
+                                {{ password_form.new_password2 }}
+                                {% for error in password_form.new_password2.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <p class="form-caption">{% tr 'settings.section.password_caption' 'La mise a jour est immediate et la session en cours est conservee.' %}</p>
+                            <button type="submit" class="ghost-button" data-loading-text="{% tr 'settings.section.password_loading' 'Mise a jour...' %}">{% tr 'settings.section.password_submit' 'Changer le mot de passe' %}</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="settings-section settings-danger">
+                    <div class="settings-section-copy">
+                        <h3>{% tr 'settings.section.delete' 'Supprimer mon compte' %}</h3>
+                        <p>
+                            {% tr 'settings.section.delete_copy' 'Cette action est irreversible. L ensemble des preferences, comptes, mouvements et trades sera supprime.' %}
+                        </p>
+                    </div>
+
+                    <form method="post" class="trade-form settings-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_account">
+
+                        <div class="form-grid">
+                            <div class="field-group field-span-2">
+                                <label for="{{ delete_account_form.password.id_for_label }}">{{ delete_account_form.password.label }}</label>
+                                {{ delete_account_form.password }}
+                                {% for error in delete_account_form.password.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group field-span-2 checkbox-field">
+                                <label class="checkbox-wrap" for="{{ delete_account_form.confirmation.id_for_label }}">
+                                    {{ delete_account_form.confirmation }}
+                                    <span>{{ delete_account_form.confirmation.label }}</span>
+                                </label>
+                                {% for error in delete_account_form.confirmation.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <p class="form-caption">{% tr 'settings.section.delete_caption' 'Apres confirmation, le compte sera supprime et la session sera redirigee vers la page de connexion.' %}</p>
+                            <button type="submit" class="danger-button" data-loading-text="{% tr 'settings.section.delete_loading' 'Suppression...' %}">{% tr 'settings.section.delete' 'Supprimer mon compte' %}</button>
+                        </div>
+                    </form>
+                </section>
+            </article>
+        </section>
+    </main>
+
+    <div
+        class="trade-modal"
+        id="account-create-modal"
+        {% if not show_account_form_modal %}hidden{% endif %}
+        aria-hidden="{% if show_account_form_modal %}false{% else %}true{% endif %}"
+    >
+        <div class="trade-modal-backdrop" data-ui-modal-close="account-create-modal"></div>
+        <section class="trade-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="account-create-modal-title">
+            <div class="trade-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'settings.modal.accounts' 'Comptes' %}</p>
+                    <h2 id="account-create-modal-title">{% tr 'settings.modal.add_account' 'Ajouter un compte' %}</h2>
+                    <p class="trade-modal-copy">
+                        {% tr 'settings.modal.add_account_copy' 'Creez un nouveau compte de trading rattache au meme utilisateur. Il peut etre defini comme compte actif des sa creation.' %}
+                    </p>
+                </div>
+                <button type="button" class="modal-close" data-ui-modal-close="account-create-modal" aria-label="{% tr 'settings.modal.close_create' 'Fermer la creation de compte' %}">X</button>
+            </div>
+
+            <form method="post" class="trade-form settings-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_account">
+
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="{{ account_form.name.id_for_label }}">{{ account_form.name.label }}</label>
+                        {{ account_form.name }}
+                        {% for error in account_form.name.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ account_form.broker.id_for_label }}">{{ account_form.broker.label }}</label>
+                        {{ account_form.broker }}
+                        {% for error in account_form.broker.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ account_form.account_identifier.id_for_label }}">{{ account_form.account_identifier.label }}</label>
+                        {{ account_form.account_identifier }}
+                        {% for error in account_form.account_identifier.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ account_form.currency.id_for_label }}">{{ account_form.currency.label }}</label>
+                        {{ account_form.currency }}
+                        {% for error in account_form.currency.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ account_form.capital_base.id_for_label }}">{{ account_form.capital_base.label }}</label>
+                        {{ account_form.capital_base }}
+                        {% for error in account_form.capital_base.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group field-span-2 checkbox-field">
+                        <label class="checkbox-wrap" for="{{ account_form.set_active.id_for_label }}">
+                            {{ account_form.set_active }}
+                            <span>{{ account_form.set_active.label }}</span>
+                        </label>
+                        {% for error in account_form.set_active.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <p class="form-caption">{% tr 'settings.modal.create_caption' 'Le compte peut etre active immediatement apres validation.' %}</p>
+                    <button type="submit" class="primary-button" data-loading-text="{% tr 'settings.modal.create_loading' 'Creation...' %}">{% tr 'settings.modal.add_account' 'Ajouter un compte' %}</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div
+        class="trade-modal"
+        id="account-edit-modal"
+        {% if not show_account_edit_modal %}hidden{% endif %}
+        aria-hidden="{% if show_account_edit_modal %}false{% else %}true{% endif %}"
+    >
+        <div class="trade-modal-backdrop" data-ui-modal-close="account-edit-modal"></div>
+        <section class="trade-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="account-edit-modal-title">
+            <div class="trade-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'settings.modal.accounts' 'Comptes' %}</p>
+                    <h2 id="account-edit-modal-title">{% tr 'settings.modal.edit_account' 'Modifier un compte' %}</h2>
+                    <p class="trade-modal-copy">
+                        {% tr 'settings.modal.edit_account_copy' 'Mettez a jour les informations de reference du compte selectionne : nom, broker, identifiant, devise et capital initial.' %}
+                    </p>
+                </div>
+                <button type="button" class="modal-close" data-ui-modal-close="account-edit-modal" aria-label="{% tr 'settings.modal.close_edit' 'Fermer la modification de compte' %}">X</button>
+            </div>
+
+            <form method="post" class="trade-form settings-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_account">
+                <input type="hidden" name="account_id" id="edit-account-id" value="{{ editing_account.id|default:'' }}">
+
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="{{ edit_account_form.name.id_for_label }}">{{ edit_account_form.name.label }}</label>
+                        {{ edit_account_form.name }}
+                        {% for error in edit_account_form.name.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ edit_account_form.broker.id_for_label }}">{{ edit_account_form.broker.label }}</label>
+                        {{ edit_account_form.broker }}
+                        {% for error in edit_account_form.broker.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ edit_account_form.account_identifier.id_for_label }}">{{ edit_account_form.account_identifier.label }}</label>
+                        {{ edit_account_form.account_identifier }}
+                        {% for error in edit_account_form.account_identifier.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ edit_account_form.currency.id_for_label }}">{{ edit_account_form.currency.label }}</label>
+                        {{ edit_account_form.currency }}
+                        {% for error in edit_account_form.currency.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group">
+                        <label for="{{ edit_account_form.capital_base.id_for_label }}">{{ edit_account_form.capital_base.label }}</label>
+                        {{ edit_account_form.capital_base }}
+                        {% for error in edit_account_form.capital_base.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="field-group field-span-2 checkbox-field">
+                        <label class="checkbox-wrap" for="{{ edit_account_form.set_active.id_for_label }}">
+                            {{ edit_account_form.set_active }}
+                            <span>{{ edit_account_form.set_active.label }}</span>
+                        </label>
+                        {% for error in edit_account_form.set_active.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <p class="form-caption">{% tr 'settings.modal.edit_caption' 'Si ce compte est actif, les parametres et le capital de reference sont resynchronises automatiquement.' %}</p>
+                    <button type="submit" class="primary-button" data-loading-text="{% tr 'settings.section.password_loading' 'Mise a jour...' %}">{% tr 'settings.modal.edit_submit' 'Enregistrer les modifications' %}</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div class="dashboard-modal" id="archived-accounts-modal" hidden aria-hidden="true">
+        <div class="dashboard-modal-backdrop" data-ui-modal-close="archived-accounts-modal"></div>
+        <section class="dashboard-modal-dialog dashboard-modal-dialog-detail" role="dialog" aria-modal="true" aria-labelledby="archived-accounts-modal-title">
+            <div class="dashboard-modal-header">
+                <div>
+                    <p class="panel-kicker">Archives</p>
+                    <h2 id="archived-accounts-modal-title">{% tr 'settings.modal.archived_accounts' 'Comptes archives' %}</h2>
+                    <p class="dashboard-modal-subtitle">
+                        {% tr 'settings.modal.archived_copy' 'Les comptes archives sont exclus du changement rapide et des statistiques actives jusqu a leur restauration.' %}
+                    </p>
+                </div>
+                <button type="button" class="modal-close" data-ui-modal-close="archived-accounts-modal" aria-label="{% tr 'settings.modal.close_archived' 'Fermer la liste des comptes archives' %}">X</button>
+            </div>
+
+            <div class="dashboard-modal-body">
+                {% if archived_trading_accounts %}
+                    <div class="account-list account-list-archived">
+                        {% for account in archived_trading_accounts %}
+                            <article class="account-card is-archived">
+                                <div class="account-card-copy">
+                                    <div class="account-card-headline">
+                                        <strong>{{ account.name }}</strong>
+                                        <span class="form-badge">{% tr 'settings.account.archived_badge' 'Archive' %}</span>
+                                    </div>
+                                    <span>{{ account.broker|default:'Broker non renseigne' }}</span>
+                                    <div class="account-card-stats">
+                                        <span class="detail-meta-pill">{{ account.currency_symbol }}{{ account.capital_base|floatformat:2 }}</span>
+                                        {% if account.account_identifier %}
+                                            <span class="detail-meta-pill">{{ account.account_identifier }}</span>
+                                        {% endif %}
+                                        <span class="detail-meta-pill">{% tr 'settings.account.archived_on' 'Archive le {date}' date=account.archived_at|date:'d/m/Y' %}</span>
+                                    </div>
+                                </div>
+                                <div class="account-card-meta">
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="restore_account">
+                                        <input type="hidden" name="account_id" value="{{ account.id }}">
+                                        <button type="submit" class="ghost-button" data-loading-text="{% tr 'settings.account.restore_loading' 'Restauration...' %}">{% tr 'settings.account.restore' 'Restaurer' %}</button>
+                                    </form>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        {% tr 'settings.modal.no_archived' 'Aucun compte archive disponible.' %}
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    {% include 'app/includes/account_switcher.html' %}
+</div>
+{% endblock %}

@@ -1,0 +1,477 @@
+{% extends 'app/base.html' %}
+{% load static app_i18n %}
+
+{% block title %}{% tr 'dashboard.page.title' 'Dashboard' %} | ZEN TRADING{% endblock %}
+{% block body_class %}dashboard-body{% endblock %}
+
+{% block extra_head %}
+    <script src="{% static 'vendor/chart.umd.min.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div
+    class="dashboard-shell"
+    id="dashboard-app"
+    data-dashboard-url="{% url 'app:dashboard-data' %}"
+    data-trade-url="{% url 'app:trade-create' %}"
+    data-trade-update-base-url="{% url 'app:trade-update' 0 %}"
+    data-demo-url="{% url 'app:demo-seed' %}"
+    data-default-symbol="{{ trade_preferences.default_symbol }}"
+    data-default-direction="{{ trade_preferences.default_direction }}"
+    data-default-setup="{{ trade_preferences.default_setup }}"
+    data-default-lot-size="{{ trade_preferences.default_lot_size }}"
+    data-default-gp-value="{{ trade_preferences.default_fees }}"
+    data-default-confidence="{{ trade_preferences.default_confidence }}"
+    data-capital-base="{{ trade_preferences.capital_base }}"
+    data-current-capital="{{ trade_current_capital|floatformat:2 }}"
+    data-currency-code="{{ trade_preferences.currency }}"
+>
+    <aside class="sidebar">
+        <button type="button" class="brand brand-trigger" data-ui-modal-open="account-switcher-modal" aria-label="{% tr 'dashboard.switch_account_aria' 'Changer rapidement de compte de trading' %}">
+            <span class="brand-mark"></span>
+            <div>
+                <strong>ZEN TRADING</strong>
+                <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
+                {% if request.user.is_superuser %}
+                    <span class="brand-admin-badge">{% tr 'common.super_admin' 'Super admin' %}</span>
+                {% endif %}
+            </div>
+        </button>
+
+        <nav class="sidebar-nav">
+            <a class="nav-item is-active" href="{% url 'app:dashboard' %}">{% tr 'nav.dashboard' 'Dashboard' %}</a>
+            <a class="nav-item" href="{% url 'app:transactions' %}">{% tr 'nav.transactions' 'Transactions' %}</a>
+            <a class="nav-item" href="{% url 'app:tools' %}">{% tr 'nav.tools' 'Outils' %}</a>
+            <a class="nav-item" href="{% url 'app:settings' %}">{% tr 'nav.settings' 'Parametres' %}</a>
+        </nav>
+
+        <article class="sidebar-card">
+            <span>{% tr 'dashboard.sidebar.score' 'Score global' %}</span>
+            <strong id="sidebar-score">--</strong>
+            <p id="sidebar-month">{% tr 'dashboard.sidebar.loading' 'Chargement...' %}</p>
+        </article>
+
+        <div class="sidebar-mini-stats">
+            <div class="mini-stat">
+                <span>{% tr 'dashboard.sidebar.all_time_pnl' 'All-time P&L' %}</span>
+                <strong id="overview-pnl">--</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'dashboard.sidebar.total_trades' 'Total trades' %}</span>
+                <strong id="overview-trades">--</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'dashboard.sidebar.leading_setup' 'Setup leader' %}</span>
+                <strong id="overview-setup">--</strong>
+            </div>
+        </div>
+
+        {% include 'app/includes/sidebar_social_links.html' %}
+
+        <form action="{% url 'app:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="danger-button button-block" data-loading-text="{% tr 'common.logout_loading' 'Deconnexion...' %}">{% tr 'common.logout' 'Se deconnecter' %}</button>
+        </form>
+    </aside>
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div>
+                <p class="eyebrow">{% tr 'dashboard.header.eyebrow' 'Journal de trading' %}</p>
+                <h1>{% tr 'dashboard.header.title' 'Dashboard de performance' %}</h1>
+                {% with user_name=request.user.first_name|default:request.user.username %}
+                <p class="header-copy">
+                    {% tr 'dashboard.header.copy' 'Bonjour {user_name}, suivez la performance du compte actif, enregistrez vos executions et actualisez le tableau de bord en temps reel.' user_name=user_name %}
+                </p>
+                {% endwith %}
+            </div>
+
+            <div class="header-actions">
+                <span class="form-badge">{{ active_account.name }}</span>
+                <button type="button" class="primary-button" id="open-trade-modal">{% tr 'dashboard.new_trade' 'Nouveau trade' %}</button>
+                {% if request.user.is_superuser %}
+                    <button type="button" class="ghost-button" id="demo-button">{% tr 'dashboard.load_demo' 'Charger des donnees de demonstration' %}</button>
+                {% endif %}
+                <button type="button" class="ghost-button" id="refresh-button">{% tr 'common.refresh' 'Rafraichir' %}</button>
+            </div>
+        </header>
+
+        <section class="toolbar">
+            <div class="toolbar-status">
+                <span class="status-dot"></span>
+                <div>
+                    <strong>{% tr 'dashboard.sync.title' 'Synchronisation asynchrone' %}</strong>
+                    <p id="last-update">{% tr 'dashboard.sync.init' 'Initialisation du tableau de bord en cours...' %}</p>
+                </div>
+            </div>
+
+            <label class="select-wrap" for="month-selector">
+                <span>{% tr 'common.period' 'Periode' %}</span>
+                <select id="month-selector"></select>
+            </label>
+        </section>
+
+        <div class="flash-message" id="flash-message" hidden></div>
+
+        <div class="page-loader" id="dashboard-loader" role="status" aria-live="polite" aria-hidden="false">
+            <div class="page-loader-card">
+                <span class="loader-spinner" aria-hidden="true"></span>
+                <strong>{% tr 'dashboard.loader.title' 'Synchronisation du dashboard' %}</strong>
+                <p data-loader-copy>{% tr 'dashboard.loader.copy' 'Chargement des indicateurs, graphiques, calendrier et executions recentes.' %}</p>
+            </div>
+        </div>
+
+        <section class="metrics-grid" id="metrics-grid"></section>
+
+        <section class="dashboard-grid dashboard-grid-top">
+            <article class="panel panel-score">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.radar' 'Radar' %}</p>
+                        <h2>{% tr 'dashboard.panel.score' 'Score performance' %}</h2>
+                    </div>
+                    <div class="panel-actions">
+                        <span class="score-pill" id="score-pill">--</span>
+                        <button type="button" class="panel-expand" data-expand-panel="radar" aria-label="{% tr 'dashboard.panel.expand_radar' 'Agrandir le radar' %}">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 8V3h5M8 16l-5 5M16 16l5 5M8 8L3 3M16 8l5-5"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="score-layout">
+                    <div class="chart-area chart-area-medium">
+                        <canvas id="radar-chart"></canvas>
+                    </div>
+                    <div class="score-summary">
+                        <strong id="score-value">--</strong>
+                        <p id="score-caption">{% tr 'dashboard.score.loading' 'Analyse en cours...' %}</p>
+                        <ul class="insight-list" id="insight-list"></ul>
+                    </div>
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.curve' 'Courbe' %}</p>
+                        <h2>{% tr 'dashboard.panel.cumulative' 'P&L cumulatif' %}</h2>
+                    </div>
+                    <button type="button" class="panel-expand" data-expand-panel="cumulative" aria-label="{% tr 'dashboard.panel.expand_curve' 'Agrandir la courbe' %}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 8V3h5M8 16l-5 5M16 16l5 5M8 8L3 3M16 8l5-5"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="chart-area chart-area-medium">
+                    <canvas id="cumulative-chart"></canvas>
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.daily' 'Quotidien' %}</p>
+                        <h2>{% tr 'dashboard.panel.daily_title' 'Net P&L quotidien' %}</h2>
+                    </div>
+                    <button type="button" class="panel-expand" data-expand-panel="daily" aria-label="{% tr 'dashboard.panel.expand_daily' 'Agrandir la vue quotidienne' %}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 8V3h5M8 16l-5 5M16 16l5 5M8 8L3 3M16 8l5-5"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="chart-area chart-area-medium">
+                    <canvas id="daily-chart"></canvas>
+                </div>
+            </article>
+        </section>
+
+        <section class="dashboard-grid dashboard-grid-middle">
+            <article class="panel panel-wide">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.combo' 'Vue combinee' %}</p>
+                        <h2>{% tr 'dashboard.panel.combo_title' 'Net P&L quotidien et cumulatif' %}</h2>
+                    </div>
+                    <button type="button" class="panel-expand" data-expand-panel="combo" aria-label="{% tr 'dashboard.panel.expand_combo' 'Agrandir la vue combinee' %}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 8V3h5M8 16l-5 5M16 16l5 5M8 8L3 3M16 8l5-5"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="chart-area chart-area-large">
+                    <canvas id="combo-chart"></canvas>
+                </div>
+            </article>
+
+            <article class="panel panel-form">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.capture_kicker' 'Capture' %}</p>
+                        <h2>{% tr 'dashboard.panel.capture_title' 'Saisie rapide' %}</h2>
+                    </div>
+                    <span class="form-badge">{% tr 'dashboard.panel.capture.badge' 'Modale asynchrone' %}</span>
+                </div>
+
+                <div class="capture-card">
+                    <p class="capture-copy">
+                        {% tr 'dashboard.panel.capture.copy' 'Ouvrez la fenetre de saisie pour enregistrer une execution sans interrompre la consultation du tableau de bord. Apres validation, les indicateurs, graphiques et le calendrier sont actualises automatiquement.' %}
+                    </p>
+                    <div class="capture-points">
+                        <span>{% tr 'dashboard.panel.capture.point_one' 'Ratio et G/P' %}</span>
+                        <span>{% tr 'dashboard.panel.capture.point_two' 'Volume et impact capital' %}</span>
+                        <span>{% tr 'dashboard.panel.capture.point_three' 'Resultat, setup et commentaires' %}</span>
+                    </div>
+                    <button type="button" class="primary-button button-block" id="open-trade-modal-secondary">
+                        {% tr 'dashboard.add_trade' 'Ajouter un trade' %}
+                    </button>
+                </div>
+            </article>
+        </section>
+
+        <section class="dashboard-grid dashboard-grid-bottom">
+            <article class="panel panel-calendar">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.calendar' 'Calendrier' %}</p>
+                        <h2>{% tr 'dashboard.panel.calendar_title' 'Calendrier de performance' %}</h2>
+                    </div>
+                    <div class="panel-actions">
+                        <span class="calendar-label" id="calendar-label">--</span>
+                        <button type="button" class="panel-expand" data-expand-panel="calendar" aria-label="{% tr 'dashboard.panel.expand_calendar' 'Agrandir le calendrier' %}">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 8V3h5M8 16l-5 5M16 16l5 5M8 8L3 3M16 8l5-5"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="calendar-shell">
+                    <div class="calendar-main">
+                        <div class="calendar-weekdays">
+                            {% for weekday in app_weekday_short_labels %}
+                                <span>{{ weekday }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="calendar-grid" id="calendar-grid"></div>
+                    </div>
+                    <div class="calendar-weeks" id="calendar-weeks"></div>
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.panel.activity' 'Activite' %}</p>
+                        <h2>{% tr 'dashboard.panel.recent_trades' 'Executions recentes' %}</h2>
+                    </div>
+                </div>
+
+                <div class="recent-trades" id="recent-trades"></div>
+            </article>
+        </section>
+    </main>
+
+    <div class="trade-modal" id="trade-modal" hidden aria-hidden="true">
+        <div class="trade-modal-backdrop" data-close-modal></div>
+        <section class="trade-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="trade-modal-title">
+            <div class="trade-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'dashboard.panel.capture_kicker' 'Capture' %}</p>
+                    <h2 id="trade-modal-title">{% tr 'dashboard.trade_modal.new' 'Nouveau trade' %}</h2>
+                    <p class="trade-modal-copy">
+                        {% tr 'dashboard.trade_modal.copy' 'Renseignez l execution ici. L enregistrement reste asynchrone et le tableau de bord est actualise apres validation.' %}
+                    </p>
+                </div>
+                <button type="button" class="modal-close" id="close-trade-modal" aria-label="{% tr 'dashboard.trade_modal.close' 'Fermer la fenetre' %}">
+                    X
+                </button>
+            </div>
+
+            <form id="trade-form" class="trade-form trade-form-modal" enctype="multipart/form-data" data-disable-submit-spinner="true">
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="executed_at">{% tr 'dashboard.trade_form.executed_at' 'Date et heure' %}</label>
+                        <input id="executed_at" name="executed_at" type="datetime-local" required>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="symbol">{% tr 'dashboard.trade_form.symbol' 'Symbole' %}</label>
+                        <input
+                            id="symbol"
+                            name="symbol"
+                            type="text"
+                            value="{{ trade_preferences.default_symbol }}"
+                            placeholder="XAUUSD"
+                            required
+                        >
+                    </div>
+
+                    <div class="field-group">
+                        <label for="direction">{% tr 'dashboard.trade_form.direction' 'Direction' %}</label>
+                        <select id="direction" name="direction">
+                            <option value="LONG" {% if trade_preferences.default_direction == 'LONG' %}selected{% endif %}>{% tr 'trade.direction.long' 'Long' %}</option>
+                            <option value="SHORT" {% if trade_preferences.default_direction == 'SHORT' %}selected{% endif %}>{% tr 'trade.direction.short' 'Short' %}</option>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="setup">{% tr 'dashboard.trade_form.setup' 'Setup' %}</label>
+                        <input
+                            id="setup"
+                            name="setup"
+                            type="text"
+                            value="{{ trade_preferences.default_setup }}"
+                            placeholder="Breakout London / Reversal NY"
+                            required
+                        >
+                    </div>
+
+                    <div class="field-group">
+                        <label for="confidence">{% tr 'dashboard.trade_form.confidence' 'Confiance' %}</label>
+                        <select id="confidence" name="confidence">
+                            <option value="1" {% if trade_preferences.default_confidence == 1 %}selected{% endif %}>1 / 5</option>
+                            <option value="2" {% if trade_preferences.default_confidence == 2 %}selected{% endif %}>2 / 5</option>
+                            <option value="3" {% if trade_preferences.default_confidence == 3 %}selected{% endif %}>3 / 5</option>
+                            <option value="4" {% if trade_preferences.default_confidence == 4 %}selected{% endif %}>4 / 5</option>
+                            <option value="5" {% if trade_preferences.default_confidence == 5 %}selected{% endif %}>5 / 5</option>
+                        </select>
+                    </div>
+
+                    <input id="entry_price" name="entry_price" type="hidden" value="0.0001">
+
+                    <div class="field-group">
+                        <label for="rr_ratio">{% tr 'dashboard.trade_form.ratio' 'Ratio' %}</label>
+                        <input id="rr_ratio" name="rr_ratio" type="number" step="0.01" placeholder="2.50 ou -1.00" required>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="result">{% tr 'dashboard.trade_form.result' 'Resultat' %}</label>
+                        <select id="result" name="result">
+                            <option value="TAKE_PROFIT" selected>{% tr 'trade.result.take_profit' 'Take profit' %}</option>
+                            <option value="BREAK_EVEN">{% tr 'trade.result.break_even' 'Break even' %}</option>
+                            <option value="STOP_LOSS">{% tr 'trade.result.stop_loss' 'Stoploss' %}</option>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="lot_size">{% tr 'dashboard.trade_form.lots' 'Quantite (lots)' %}</label>
+                        <input
+                            id="lot_size"
+                            name="lot_size"
+                            type="number"
+                            step="0.01"
+                            value="{{ trade_preferences.default_lot_size }}"
+                            placeholder="1.00"
+                            required
+                        >
+                    </div>
+
+                    <div class="field-group">
+                        <label for="gp_value">{% tr 'dashboard.trade_form.gp' 'G/P' %}</label>
+                        <input
+                            id="gp_value"
+                            name="gp_value"
+                            type="number"
+                            step="0.01"
+                            value="{{ trade_preferences.default_fees }}"
+                            placeholder="25.00"
+                        >
+                    </div>
+
+                    <div class="field-group">
+                        <span class="field-static-label" id="capital-impact-label">{% tr 'dashboard.trade_form.capital_gain' 'Gain sur capital (%)' %}</span>
+                        <div class="field-static-box">
+                            <strong class="field-static-value is-profit" id="capital-impact-percent">+0.00%</strong>
+                        </div>
+                        <small class="field-help" id="trade-capital-hint">
+                            {% with capital_value=trade_current_capital|floatformat:2 %}
+                                {% tr 'dashboard.trade_form.capital_hint' 'Calcul base sur un capital actuel de {capital}.' capital=trade_preferences.currency_symbol|add:capital_value %}
+                            {% endwith %}
+                        </small>
+                        <small class="field-help">{% tr 'dashboard.trade_form.capital_help' 'TP = gain, SL = perte, BE = 0.00%.' %}</small>
+                    </div>
+
+                    <div class="field-group field-span-2">
+                        <label for="screenshot">{% tr 'dashboard.trade_form.image' 'Image du trade' %}</label>
+                        <input id="screenshot" name="screenshot" type="file" accept="image/*">
+                        <small class="field-help">{% tr 'dashboard.trade_form.image_help' 'Image compressee automatiquement avant televersement.' %}</small>
+                        <div class="image-preview" id="image-preview" hidden>
+                            <img id="image-preview-tag" alt="Apercu du trade">
+                            <div class="image-preview-meta">
+                                <strong id="image-preview-name">{% tr 'dashboard.trade_form.preview_empty' 'Aucun fichier selectionne' %}</strong>
+                                <span id="image-preview-size">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-group field-span-2">
+                        <label for="notes">{% tr 'dashboard.trade_form.notes' 'Notes' %}</label>
+                        <textarea id="notes" name="notes" rows="4" placeholder="{% tr 'dashboard.trade_form.notes_placeholder' 'Contexte, execution, gestion du risque, observations...' %}"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <p class="form-caption">{% tr 'dashboard.trade_form.submit_caption' 'Le trade est enregistre puis le tableau de bord est actualise automatiquement.' %}</p>
+                    <button type="submit" class="primary-button">{% tr 'dashboard.trade_form.submit' 'Enregistrer le trade' %}</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div class="dashboard-modal" id="panel-modal" hidden aria-hidden="true">
+        <div class="dashboard-modal-backdrop" data-close-panel-modal></div>
+        <section class="dashboard-modal-dialog dashboard-modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="panel-modal-title">
+            <div class="dashboard-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'dashboard.modal.expand' 'Agrandissement' %}</p>
+                    <h2 id="panel-modal-title">{% tr 'dashboard.modal.detailed_view' 'Vue detaillee' %}</h2>
+                </div>
+                <button type="button" class="modal-close" id="close-panel-modal" aria-label="{% tr 'dashboard.modal.close_expand' 'Fermer l agrandissement' %}">X</button>
+            </div>
+
+            <div class="dashboard-modal-body">
+                <div class="chart-area chart-area-expanded" id="expanded-chart-wrap">
+                    <canvas id="expanded-panel-canvas"></canvas>
+                </div>
+                <div class="expanded-calendar-wrap" id="expanded-calendar-wrap" hidden>
+                    <div class="calendar-shell calendar-shell-expanded">
+                        <div class="calendar-main">
+                        <div class="calendar-weekdays">
+                                {% for weekday in app_weekday_short_labels %}
+                                    <span>{{ weekday }}</span>
+                                {% endfor %}
+                            </div>
+                            <div class="calendar-grid" id="expanded-calendar-grid"></div>
+                        </div>
+                        <div class="calendar-weeks" id="expanded-calendar-weeks"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="dashboard-modal" id="detail-modal" hidden aria-hidden="true">
+        <div class="dashboard-modal-backdrop" data-close-detail-modal></div>
+        <section class="dashboard-modal-dialog dashboard-modal-dialog-detail" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+            <div class="dashboard-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'dashboard.modal.details' 'Details' %}</p>
+                    <h2 id="detail-modal-title">{% tr 'dashboard.modal.trade' 'Trade' %}</h2>
+                    <p class="dashboard-modal-subtitle" id="detail-modal-subtitle">{% tr 'dashboard.modal.loading_detail' 'Chargement du detail...' %}</p>
+                </div>
+                <button type="button" class="modal-close" id="close-detail-modal" aria-label="{% tr 'dashboard.modal.close_details' 'Fermer les details' %}">X</button>
+            </div>
+
+            <div class="dashboard-modal-body" id="detail-modal-body"></div>
+        </section>
+    </div>
+
+    {% include 'app/includes/account_switcher.html' %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'app/dashboard.js' %}" defer></script>
+{% endblock %}

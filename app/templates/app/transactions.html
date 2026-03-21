@@ -1,0 +1,275 @@
+{% extends 'app/base.html' %}
+{% load static app_i18n %}
+
+{% block title %}{% tr 'transactions.page.title' 'Transactions' %} | ZEN TRADING{% endblock %}
+{% block body_class %}dashboard-body{% endblock %}
+
+{% block extra_head %}
+    <script src="{% static 'vendor/chart.umd.min.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div
+    class="dashboard-shell"
+    id="transactions-app"
+    data-transactions-url="{% url 'app:transactions-data' %}"
+    data-movement-url="{% url 'app:capital-movement-create' %}"
+>
+    <aside class="sidebar">
+        <button type="button" class="brand brand-trigger" data-ui-modal-open="account-switcher-modal" aria-label="{% tr 'dashboard.switch_account_aria' 'Changer rapidement de compte de trading' %}">
+            <span class="brand-mark"></span>
+            <div>
+                <strong>ZEN TRADING</strong>
+                <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
+                {% if request.user.is_superuser %}
+                    <span class="brand-admin-badge">{% tr 'common.super_admin' 'Super admin' %}</span>
+                {% endif %}
+            </div>
+        </button>
+
+        <nav class="sidebar-nav">
+            <a class="nav-item" href="{% url 'app:dashboard' %}">{% tr 'nav.dashboard' 'Dashboard' %}</a>
+            <a class="nav-item is-active" href="{% url 'app:transactions' %}">{% tr 'nav.transactions' 'Transactions' %}</a>
+            <a class="nav-item" href="{% url 'app:tools' %}">{% tr 'nav.tools' 'Outils' %}</a>
+            <a class="nav-item" href="{% url 'app:settings' %}">{% tr 'nav.settings' 'Parametres' %}</a>
+        </nav>
+
+        <article class="sidebar-card">
+            <span>{% tr 'transactions.sidebar.current_capital' 'Capital actuel' %}</span>
+            <strong id="transactions-current-capital">{{ trade_preferences.currency_symbol }}{{ trade_preferences.capital_base|floatformat:2 }}</strong>
+            <p id="transactions-capital-copy">
+                {% with capital_number=trade_preferences.capital_base|floatformat:2 %}
+                {% with capital_value=trade_preferences.currency_symbol|add:capital_number %}
+                    {% tr 'transactions.sidebar.pending_sync' 'Base {capital} | Synchronisation en attente.' capital=capital_value %}
+                {% endwith %}
+                {% endwith %}
+            </p>
+        </article>
+
+        <div class="sidebar-mini-stats">
+            <div class="mini-stat">
+                <span>{% tr 'transactions.sidebar.trades_month' 'Trades ce mois' %}</span>
+                <strong id="transactions-month-trades">--</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'transactions.sidebar.winners' 'Gagnants' %}</span>
+                <strong id="transactions-month-winners">--</strong>
+            </div>
+            <div class="mini-stat">
+                <span>{% tr 'transactions.sidebar.losers' 'Perdants' %}</span>
+                <strong id="transactions-month-losers">--</strong>
+            </div>
+        </div>
+
+        {% include 'app/includes/sidebar_social_links.html' %}
+
+        <form action="{% url 'app:logout' %}" method="post" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="danger-button button-block" data-loading-text="{% tr 'common.logout_loading' 'Deconnexion...' %}">{% tr 'common.logout' 'Se deconnecter' %}</button>
+        </form>
+    </aside>
+
+    <main class="dashboard-main">
+        <header class="dashboard-header">
+            <div>
+                <p class="eyebrow">{% tr 'transactions.header.eyebrow' 'Flux de capital' %}</p>
+                <h1>{% tr 'transactions.header.title' 'Transactions' %}</h1>
+                <p class="header-copy">
+                    {% tr 'transactions.header.copy' 'Analysez l historique mensuel du G/P, les depots et les retraits du compte actif, avec recalcul automatique du capital et des indicateurs.' %}
+                </p>
+            </div>
+
+            <div class="header-actions">
+                <span class="form-badge">{{ active_account.name }}</span>
+                <button type="button" class="success-button" id="open-withdrawal-modal">{% tr 'transactions.new_withdrawal' 'Nouveau retrait' %}</button>
+                <button type="button" class="warning-button" id="open-deposit-modal">{% tr 'transactions.new_deposit' 'Nouveau depot' %}</button>
+                <button type="button" class="ghost-button" id="transactions-refresh">{% tr 'common.refresh' 'Rafraichir' %}</button>
+            </div>
+        </header>
+
+        <section class="toolbar">
+            <div class="toolbar-status">
+                <span class="status-dot"></span>
+                <div>
+                    <strong>{% tr 'dashboard.sync.title' 'Synchronisation asynchrone' %}</strong>
+                    <p id="transactions-last-update">{% tr 'transactions.sync.init' 'Initialisation des transactions en cours...' %}</p>
+                </div>
+            </div>
+
+            <span class="calendar-label" id="transactions-current-month">--</span>
+        </section>
+
+        <div class="flash-message" id="transactions-flash" hidden></div>
+
+        <div class="page-loader" id="transactions-loader" role="status" aria-live="polite" aria-hidden="false">
+            <div class="page-loader-card">
+                <span class="loader-spinner" aria-hidden="true"></span>
+                <strong>{% tr 'transactions.loader.title' 'Synchronisation des transactions' %}</strong>
+                <p data-loader-copy>{% tr 'transactions.loader.copy' 'Chargement du capital, des flux et de l historique mensuel.' %}</p>
+            </div>
+        </div>
+
+        <section class="metrics-grid" id="transactions-metrics"></section>
+
+        <section class="dashboard-grid dashboard-grid-top">
+            <article class="panel panel-wide">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'transactions.panel.curve' 'Courbe' %}</p>
+                        <h2>{% tr 'transactions.panel.monthly_gp_history' 'Historique mensuel des G/P' %}</h2>
+                    </div>
+                    <span class="form-badge">{% tr 'transactions.panel.last_12_months' '12 derniers mois' %}</span>
+                </div>
+                <div class="chart-area chart-area-large">
+                    <canvas id="transactions-chart"></canvas>
+                </div>
+            </article>
+
+            <article class="panel panel-form transactions-panel-side">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'transactions.panel.flow' 'Flux' %}</p>
+                        <h2>{% tr 'transactions.panel.deposits_withdrawals' 'Depots et retraits' %}</h2>
+                    </div>
+                    <div class="panel-actions">
+                        <span class="form-badge" id="movements-preview-badge">{% tr 'transactions.panel.last_two' '2 derniers' %}</span>
+                        <button type="button" class="panel-expand" id="open-movements-modal" aria-label="{% tr 'transactions.panel.expand_list' 'Agrandir la liste des transactions' %}">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 8V3h5M8 16l-5 5M16 16l5 5M8 8L3 3M16 8l5-5"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="transaction-highlights">
+                    <article class="detail-card">
+                        <span>{% tr 'transactions.panel.net_month' 'Net du mois' %}</span>
+                        <strong id="transactions-highlight-net">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'transactions.panel.withdrawals_month' 'Retraits du mois' %}</span>
+                        <strong id="transactions-highlight-withdrawals">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'transactions.panel.deposits_month' 'Depots du mois' %}</span>
+                        <strong id="transactions-highlight-deposits">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'transactions.panel.best_month' 'Meilleur mois' %}</span>
+                        <strong id="transactions-highlight-best-month">--</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'transactions.panel.worst_month' 'Mauvais mois' %}</span>
+                        <strong id="transactions-highlight-worst-month">--</strong>
+                    </article>
+                </div>
+
+                <div class="movement-list" id="movements-list"></div>
+            </article>
+        </section>
+
+        <section class="dashboard-grid">
+            <article class="panel transactions-history-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">{% tr 'transactions.panel.history' 'Historique' %}</p>
+                        <h2>{% tr 'transactions.panel.monthly_history' 'Historique mensuel' %}</h2>
+                    </div>
+                    <span class="form-badge">{% tr 'transactions.panel.gp_flux_stats' 'G/P, flux et stats' %}</span>
+                </div>
+
+                <div class="history-table-wrap">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>{% tr 'transactions.history.month' 'Mois' %}</th>
+                                <th>{% tr 'transactions.history.capital_start' 'Capital debut' %}</th>
+                                <th>G/P</th>
+                                <th>{% tr 'transactions.history.deposits' 'Depots' %}</th>
+                                <th>{% tr 'transactions.history.withdrawals' 'Retraits' %}</th>
+                                <th>{% tr 'transactions.history.net' 'Net' %}</th>
+                                <th>{% tr 'transactions.history.trades' 'Trades' %}</th>
+                                <th>{% tr 'transactions.history.winners' 'Gagnants' %}</th>
+                                <th>{% tr 'transactions.history.losers' 'Perdants' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <div class="trade-modal" id="movement-modal" hidden aria-hidden="true">
+        <div class="trade-modal-backdrop" data-close-movement-modal></div>
+        <section class="trade-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-modal-title">
+            <div class="trade-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'transactions.modal.capital_flow' 'Flux de capital' %}</p>
+                    <h2 id="movement-modal-title">{% tr 'transactions.modal.record_withdrawal' 'Enregistrer un retrait' %}</h2>
+                    <p class="trade-modal-copy" id="movement-modal-copy">
+                        {% tr 'transactions.modal.withdrawal_copy' 'Enregistrez une sortie de capital. Le capital actuel et l historique mensuel sont recalcules a la validation.' %}
+                    </p>
+                </div>
+                <button type="button" class="modal-close" id="close-movement-modal" aria-label="{% tr 'transactions.modal.close' 'Fermer la fenetre' %}">
+                    X
+                </button>
+            </div>
+
+            <form id="movement-form" class="trade-form" data-disable-submit-spinner="true">
+                <input id="movement-kind" name="kind" type="hidden" value="WITHDRAWAL">
+
+                <div class="form-grid">
+                    <div class="field-group">
+                        <label for="movement-occurred-at">{% tr 'dashboard.trade_form.executed_at' 'Date et heure' %}</label>
+                        <input id="movement-occurred-at" name="occurred_at" type="datetime-local" required>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="movement-amount" id="movement-amount-label">{% tr 'transactions.form.amount_withdrawal' 'Montant du retrait' %}</label>
+                        <input id="movement-amount" name="amount" type="number" step="0.01" min="0.01" placeholder="500.00" required>
+                    </div>
+
+                    <div class="field-group field-span-2">
+                        <label for="movement-note">{% tr 'transactions.form.note' 'Note' %}</label>
+                        <input id="movement-note" name="note" type="text" maxlength="160" placeholder="{% tr 'transactions.form.note_withdrawal_placeholder' 'Ex: retrait mensuel, securisation de performance' %}">
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <p class="form-caption" id="movement-form-caption">
+                        {% tr 'transactions.form.withdrawal_caption' 'Le retrait diminue le capital actuel et s integre a l historique mensuel.' %}
+                    </p>
+                    <button type="submit" class="success-button" id="movement-submit">{% tr 'transactions.form.record_withdrawal' 'Enregistrer le retrait' %}</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div class="dashboard-modal" id="movements-modal" hidden aria-hidden="true">
+        <div class="dashboard-modal-backdrop" data-close-movements-modal></div>
+        <section class="dashboard-modal-dialog dashboard-modal-dialog-detail" role="dialog" aria-modal="true" aria-labelledby="movements-modal-title">
+            <div class="dashboard-modal-header">
+                <div>
+                    <p class="panel-kicker">{% tr 'transactions.panel.flow' 'Flux' %}</p>
+                    <h2 id="movements-modal-title">{% tr 'transactions.modal.all_transactions' 'Toutes les transactions' %}</h2>
+                    <p class="dashboard-modal-subtitle">
+                        {% tr 'transactions.modal.all_transactions_copy' 'Historique complet des depots et retraits. Faites defiler la liste pour consulter l ensemble des operations.' %}
+                    </p>
+                </div>
+                <button type="button" class="modal-close" id="close-movements-modal" aria-label="{% tr 'transactions.modal.close_all' 'Fermer la liste des transactions' %}">X</button>
+            </div>
+
+            <div class="dashboard-modal-body">
+                <div class="movement-list movement-list-scroll" id="movements-modal-list"></div>
+            </div>
+        </section>
+    </div>
+
+    {% include 'app/includes/account_switcher.html' %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'app/transactions.js' %}" defer></script>
+{% endblock %}

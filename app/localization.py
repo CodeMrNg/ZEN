@@ -255,8 +255,6 @@ TRANSLATIONS = {
     "dashboard.insight.best_day": pack("Meilleure journee : {value}", "Best day: {value}", "Mejor jornada: {value}", "Melhor dia: {value}"),
     "dashboard.insight.max_drawdown": pack("Drawdown quotidien maximal : {value}", "Maximum daily drawdown: {value}", "Drawdown diario maximo: {value}", "Drawdown diario maximo: {value}"),
     "dashboard.insight.empty_one": pack("Enregistrez les premiers trades pour activer les indicateurs.", "Record your first trades to activate the metrics.", "Registre sus primeros trades para activar las metricas.", "Registre seus primeiros trades para ativar as metricas."),
-    "dashboard.insight.empty_two": pack("Le tableau de bord sera actualise automatiquement.", "The dashboard will refresh automatically.", "El panel se actualizara automaticamente.", "O dashboard sera atualizado automaticamente."),
-    "dashboard.insight.empty_three": pack("Un jeu de donnees de demonstration peut egalement etre charge.", "A demo dataset can also be loaded.", "Tambien puede cargar un conjunto de datos de demostracion.", "Um conjunto de dados de demonstracao tambem pode ser carregado."),
     "dashboard.chart.win_rate": pack("Taux de reussite", "Win rate", "Tasa de acierto", "Taxa de acerto"),
     "dashboard.chart.consistency": pack("Regularite", "Consistency", "Consistencia", "Consistencia"),
     "dashboard.chart.gain_loss": pack("Gain / perte", "Gain / loss", "Ganancia / perdida", "Ganho / perda"),

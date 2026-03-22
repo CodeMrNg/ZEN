@@ -584,6 +584,13 @@ def serialize_trade(trade, currency='USD', language=None):
     screenshots = serialize_trade_screenshots(trade)
     screenshot_urls = [item['url'] for item in screenshots]
     screenshot_url = screenshot_urls[0] if screenshot_urls else None
+    serialized_result = trade.resolved_result
+    serialized_gp_value = trade.gp_value
+    if serialized_gp_value is None:
+        serialized_gp_value = trade.net_pnl.quantize(Decimal('0.01'))
+    serialized_ratio = trade.rr_ratio
+    if serialized_ratio is None and trade.risk_amount not in (None, Decimal('0.00')):
+        serialized_ratio = (trade.net_pnl / trade.risk_amount).quantize(Decimal('0.01'))
     result_label_map = {
         Trade.Result.TAKE_PROFIT: tr('trade.result.take_profit', language=language, default='Take profit'),
         Trade.Result.GAIN: tr('trade.result.gain', language=language, default='Gain'),
@@ -602,9 +609,9 @@ def serialize_trade(trade, currency='USD', language=None):
         'symbol': trade.symbol,
         'direction': trade.get_direction_display(),
         'direction_code': trade.direction,
-        'result': trade.resolved_result,
-        'result_code': trade.resolved_result,
-        'result_label': result_label_map.get(trade.resolved_result, trade.resolved_result_label),
+        'result': serialized_result,
+        'result_code': serialized_result,
+        'result_label': result_label_map.get(serialized_result, trade.resolved_result_label),
         'setup': trade.setup,
         'market': trade.market or 'Spot',
         'executed_at': executed_at.isoformat(),
@@ -612,12 +619,12 @@ def serialize_trade(trade, currency='USD', language=None):
         'executed_at_label': executed_at.strftime('%d/%m/%Y | %H:%M'),
         'entry_price': f'{trade.entry_price:,.4f}',
         'entry_price_value': f'{trade.entry_price:.4f}',
-        'ratio': None if trade.rr_ratio is None else round(float(trade.rr_ratio), 2),
-        'ratio_value': None if trade.rr_ratio is None else format_decimal_compact(abs(trade.rr_ratio)),
-        'ratio_label': '--' if trade.rr_ratio is None else f'R {format_decimal_compact(trade.rr_ratio, use_grouping=True)}',
-        'gp_value': None if trade.gp_value is None else round(float(trade.gp_value), 2),
-        'gp_value_value': None if trade.gp_value is None else format_decimal_compact(abs(trade.gp_value)),
-        'gp_value_label': '--' if trade.gp_value is None else format_signed_value(trade.gp_value),
+        'ratio': None if serialized_ratio is None else round(float(serialized_ratio), 2),
+        'ratio_value': None if serialized_ratio is None else format_decimal_compact(abs(serialized_ratio)),
+        'ratio_label': '--' if serialized_ratio is None else f'R {format_decimal_compact(serialized_ratio, use_grouping=True)}',
+        'gp_value': None if serialized_gp_value is None else round(float(serialized_gp_value), 2),
+        'gp_value_value': None if serialized_gp_value is None else format_decimal_compact(abs(serialized_gp_value)),
+        'gp_value_label': '--' if serialized_gp_value is None else format_signed_value(serialized_gp_value),
         'lot_size': float(trade.lot_size or trade.quantity),
         'lot_size_value': format_decimal_compact(trade.lot_size or trade.quantity),
         'lot_size_label': f'{format_decimal_compact(trade.lot_size or trade.quantity, use_grouping=True)} lot(s)',
@@ -845,8 +852,6 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, lan
     else:
         insight_lines = [
             tr('dashboard.insight.empty_one', language=language, default='Enregistrez les premiers trades pour activer les indicateurs.'),
-            tr('dashboard.insight.empty_two', language=language, default='Le tableau de bord sera actualise automatiquement.'),
-            tr('dashboard.insight.empty_three', language=language, default='Un jeu de donnees de demonstration peut egalement etre charge.'),
         ]
 
     monthly_trades = [serialize_trade(trade, currency, language=language) for trade in reversed(filtered_trades)]

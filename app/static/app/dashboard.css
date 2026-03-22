@@ -2765,6 +2765,12 @@ button {
     border-radius: 14px;
 }
 
+.icon-button:disabled,
+.image-viewer-zoom-value:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .icon-button.is-danger {
     border-color: rgba(239, 100, 100, 0.2);
     color: #ffd1d1;
@@ -2778,6 +2784,16 @@ button {
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.image-viewer-zoom-value {
+    min-width: 74px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 14px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
 }
 
 .image-viewer-stage {
@@ -2794,6 +2810,36 @@ button {
         radial-gradient(circle at top right, rgba(122, 184, 255, 0.1), transparent 28%),
         rgba(255, 255, 255, 0.03);
     overflow: hidden;
+    cursor: zoom-in;
+    touch-action: none;
+    user-select: none;
+    overscroll-behavior: contain;
+}
+
+.image-viewer-stage:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 0 0 4px rgba(122, 184, 255, 0.22);
+}
+
+.image-viewer-stage.is-zoomed {
+    cursor: grab;
+}
+
+.image-viewer-stage.is-panning {
+    cursor: grabbing;
+}
+
+.image-viewer-viewport {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .image-viewer-image {
@@ -2805,6 +2851,14 @@ button {
     object-fit: contain;
     border-radius: 20px;
     box-shadow: 0 28px 72px rgba(0, 0, 0, 0.38);
+    transform-origin: center center;
+    will-change: transform;
+    transition: transform 0.14s ease;
+    pointer-events: none;
+}
+
+.image-viewer-stage.is-panning .image-viewer-image {
+    transition: none;
 }
 
 .chart-area-expanded {

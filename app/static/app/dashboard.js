@@ -202,6 +202,13 @@ if (appNode) {
         existingScreenshots: [],
         removedScreenshotIds: new Set(),
         imageViewerContext: null,
+        imageViewerZoom: 1,
+        imageViewerOffsetX: 0,
+        imageViewerOffsetY: 0,
+        imageViewerPointers: new Map(),
+        imageViewerPinchDistance: null,
+        imageViewerPanPointerId: null,
+        imageViewerPanOrigin: null,
     };
 
     const endpoints = {
@@ -245,7 +252,13 @@ if (appNode) {
     const imageViewerModal = document.getElementById("image-viewer-modal");
     const closeImageViewerButton = document.getElementById("close-image-viewer");
     const imageViewerTitle = document.getElementById("image-viewer-title");
+    const imageViewerStage = document.getElementById("image-viewer-stage");
+    const imageViewerViewport = document.getElementById("image-viewer-viewport");
     const imageViewerImage = document.getElementById("image-viewer-image");
+    const imageViewerZoomOutButton = document.getElementById("image-viewer-zoom-out");
+    const imageViewerZoomResetButton = document.getElementById("image-viewer-zoom-reset");
+    const imageViewerZoomValue = document.getElementById("image-viewer-zoom-value");
+    const imageViewerZoomInButton = document.getElementById("image-viewer-zoom-in");
     const imageViewerDownload = document.getElementById("image-viewer-download");
     const imageViewerRemoveButton = document.getElementById("image-viewer-remove");
     const tradeForm = document.getElementById("trade-form");
@@ -303,6 +316,16 @@ if (appNode) {
         closeDetailModalButton.addEventListener("click", closeDetailModal);
         closeMonthTradesModalButton.addEventListener("click", closeMonthTradesModal);
         closeImageViewerButton.addEventListener("click", closeImageViewer);
+        imageViewerImage.addEventListener("load", handleImageViewerLoad);
+        imageViewerStage.addEventListener("wheel", handleImageViewerWheel, { passive: false });
+        imageViewerStage.addEventListener("dblclick", handleImageViewerDoubleClick);
+        imageViewerStage.addEventListener("pointerdown", handleImageViewerPointerDown);
+        imageViewerStage.addEventListener("pointermove", handleImageViewerPointerMove);
+        imageViewerStage.addEventListener("pointerup", handleImageViewerPointerEnd);
+        imageViewerStage.addEventListener("pointercancel", handleImageViewerPointerEnd);
+        imageViewerZoomOutButton.addEventListener("click", () => zoomImageViewerBy(1 / 1.25));
+        imageViewerZoomResetButton.addEventListener("click", () => setImageViewerZoom(1));
+        imageViewerZoomInButton.addEventListener("click", () => zoomImageViewerBy(1.25));
         expandButtons.forEach((button) => {
             button.addEventListener("click", () => openPanelModal(button.dataset.expandPanel));
         });
@@ -346,6 +369,8 @@ if (appNode) {
             }
         });
         imageViewerRemoveButton.addEventListener("click", handleImageViewerRemove);
+        window.addEventListener("resize", handleImageViewerViewportChange);
+        document.addEventListener("keydown", handleImageViewerKeydown);
         document.addEventListener("keydown", (event) => {
             if (event.key !== "Escape") {
                 return;
@@ -1038,8 +1063,335 @@ if (appNode) {
         closeModal(monthTradesModal);
     }
 
+    function isImageViewerOpen() {
+        return !imageViewerModal.hidden && Boolean(imageViewerImage.getAttribute("src"));
+    }
+
+    function getImageViewerViewportRect() {
+        return imageViewerViewport?.getBoundingClientRect() || null;
+    }
+
+    function getImageViewerViewportSize() {
+        const rect = getImageViewerViewportRect();
+        if (!rect) {
+            return { width: 0, height: 0 };
+        }
+        return {
+            width: rect.width,
+            height: rect.height,
+        };
+    }
+
+    function getImageViewerBaseSize() {
+        const { width: viewportWidth, height: viewportHeight } = getImageViewerViewportSize();
+        const naturalWidth = imageViewerImage.naturalWidth || 0;
+        const naturalHeight = imageViewerImage.naturalHeight || 0;
+        if (!viewportWidth || !viewportHeight || !naturalWidth || !naturalHeight) {
+            return { width: 0, height: 0 };
+        }
+
+        const containRatio = Math.min(
+            viewportWidth / naturalWidth,
+            viewportHeight / naturalHeight,
+            1,
+        );
+
+        return {
+            width: naturalWidth * containRatio,
+            height: naturalHeight * containRatio,
+        };
+    }
+
+    function clampImageViewerOffsets(offsetX = state.imageViewerOffsetX, offsetY = state.imageViewerOffsetY, scale = state.imageViewerZoom) {
+        if (scale <= 1) {
+            return { x: 0, y: 0 };
+        }
+
+        const { width: viewportWidth, height: viewportHeight } = getImageViewerViewportSize();
+        const { width: baseWidth, height: baseHeight } = getImageViewerBaseSize();
+        if (!viewportWidth || !viewportHeight || !baseWidth || !baseHeight) {
+            return { x: 0, y: 0 };
+        }
+
+        const maxOffsetX = Math.max(0, ((baseWidth * scale) - viewportWidth) / 2);
+        const maxOffsetY = Math.max(0, ((baseHeight * scale) - viewportHeight) / 2);
+
+        return {
+            x: Math.min(maxOffsetX, Math.max(-maxOffsetX, offsetX)),
+            y: Math.min(maxOffsetY, Math.max(-maxOffsetY, offsetY)),
+        };
+    }
+
+    function updateImageViewerZoomUi() {
+        const isAtBaseZoom = state.imageViewerZoom <= 1.001;
+        const isAtMaxZoom = state.imageViewerZoom >= 128;
+        imageViewerZoomValue.textContent = `${Math.round(state.imageViewerZoom * 100)}%`;
+        imageViewerZoomOutButton.disabled = isAtBaseZoom;
+        imageViewerZoomResetButton.disabled = isAtBaseZoom;
+        imageViewerZoomInButton.disabled = isAtMaxZoom;
+    }
+
+    function syncImageViewerStageState() {
+        const isZoomed = state.imageViewerZoom > 1.001;
+        const isPanning = isZoomed && state.imageViewerPanPointerId !== null;
+        imageViewerStage.classList.toggle("is-zoomed", isZoomed);
+        imageViewerStage.classList.toggle("is-panning", isPanning);
+    }
+
+    function applyImageViewerTransform() {
+        const clampedOffsets = clampImageViewerOffsets();
+        state.imageViewerOffsetX = clampedOffsets.x;
+        state.imageViewerOffsetY = clampedOffsets.y;
+        imageViewerImage.style.transform = `translate3d(${state.imageViewerOffsetX}px, ${state.imageViewerOffsetY}px, 0) scale(${state.imageViewerZoom})`;
+        syncImageViewerStageState();
+        updateImageViewerZoomUi();
+    }
+
+    function resetImageViewerTransform() {
+        state.imageViewerZoom = 1;
+        state.imageViewerOffsetX = 0;
+        state.imageViewerOffsetY = 0;
+        state.imageViewerPointers.clear();
+        state.imageViewerPinchDistance = null;
+        state.imageViewerPanPointerId = null;
+        state.imageViewerPanOrigin = null;
+        imageViewerImage.style.transform = "translate3d(0px, 0px, 0) scale(1)";
+        syncImageViewerStageState();
+        updateImageViewerZoomUi();
+    }
+
+    function setImageViewerZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
+        const targetZoom = Math.min(Math.max(nextZoom, 1), 128);
+        if (!Number.isFinite(targetZoom) || !imageViewerImage.naturalWidth) {
+            return;
+        }
+
+        const previousZoom = state.imageViewerZoom || 1;
+        if (Math.abs(targetZoom - previousZoom) < 0.0001) {
+            return;
+        }
+
+        if (Number.isFinite(anchorClientX) && Number.isFinite(anchorClientY) && previousZoom > 0) {
+            const rect = getImageViewerViewportRect();
+            if (rect) {
+                const anchorX = anchorClientX - (rect.left + (rect.width / 2));
+                const anchorY = anchorClientY - (rect.top + (rect.height / 2));
+                const scaleRatio = targetZoom / previousZoom;
+                state.imageViewerOffsetX = anchorX - ((anchorX - state.imageViewerOffsetX) * scaleRatio);
+                state.imageViewerOffsetY = anchorY - ((anchorY - state.imageViewerOffsetY) * scaleRatio);
+            }
+        } else if (targetZoom <= 1) {
+            state.imageViewerOffsetX = 0;
+            state.imageViewerOffsetY = 0;
+        }
+
+        state.imageViewerZoom = targetZoom;
+        applyImageViewerTransform();
+    }
+
+    function zoomImageViewerBy(multiplier, anchorClientX = null, anchorClientY = null) {
+        if (!Number.isFinite(multiplier) || multiplier <= 0) {
+            return;
+        }
+        setImageViewerZoom(state.imageViewerZoom * multiplier, anchorClientX, anchorClientY);
+    }
+
+    function getActiveImageViewerPointers() {
+        return Array.from(state.imageViewerPointers.entries());
+    }
+
+    function syncImageViewerPinchZoom() {
+        const pointers = getActiveImageViewerPointers();
+        if (pointers.length < 2) {
+            state.imageViewerPinchDistance = null;
+            return;
+        }
+
+        const [, firstPointer] = pointers[0];
+        const [, secondPointer] = pointers[1];
+        const distance = Math.hypot(
+            secondPointer.clientX - firstPointer.clientX,
+            secondPointer.clientY - firstPointer.clientY,
+        );
+
+        if (distance <= 0) {
+            return;
+        }
+
+        const anchorClientX = (firstPointer.clientX + secondPointer.clientX) / 2;
+        const anchorClientY = (firstPointer.clientY + secondPointer.clientY) / 2;
+
+        if (state.imageViewerPinchDistance) {
+            zoomImageViewerBy(distance / state.imageViewerPinchDistance, anchorClientX, anchorClientY);
+        }
+
+        state.imageViewerPinchDistance = distance;
+    }
+
+    function handleImageViewerLoad() {
+        resetImageViewerTransform();
+        window.requestAnimationFrame(() => {
+            imageViewerStage.focus({ preventScroll: true });
+        });
+    }
+
+    function handleImageViewerViewportChange() {
+        if (!isImageViewerOpen()) {
+            return;
+        }
+
+        if (state.imageViewerZoom <= 1) {
+            resetImageViewerTransform();
+            return;
+        }
+
+        applyImageViewerTransform();
+    }
+
+    function handleImageViewerWheel(event) {
+        if (!isImageViewerOpen()) {
+            return;
+        }
+
+        event.preventDefault();
+        const zoomFactor = Math.exp(-event.deltaY * 0.0015);
+        zoomImageViewerBy(zoomFactor, event.clientX, event.clientY);
+    }
+
+    function handleImageViewerDoubleClick(event) {
+        if (!isImageViewerOpen()) {
+            return;
+        }
+
+        event.preventDefault();
+        if (state.imageViewerZoom > 1.001) {
+            setImageViewerZoom(1);
+            return;
+        }
+
+        setImageViewerZoom(2, event.clientX, event.clientY);
+    }
+
+    function handleImageViewerPointerDown(event) {
+        if (!isImageViewerOpen()) {
+            return;
+        }
+        if (event.pointerType === "mouse" && event.button !== 0) {
+            return;
+        }
+
+        imageViewerStage.focus({ preventScroll: true });
+        imageViewerStage.setPointerCapture?.(event.pointerId);
+        state.imageViewerPointers.set(event.pointerId, {
+            clientX: event.clientX,
+            clientY: event.clientY,
+        });
+
+        if (state.imageViewerPointers.size >= 2) {
+            state.imageViewerPanPointerId = null;
+            state.imageViewerPanOrigin = null;
+            state.imageViewerPinchDistance = null;
+            syncImageViewerPinchZoom();
+            syncImageViewerStageState();
+            return;
+        }
+
+        if (state.imageViewerZoom > 1) {
+            state.imageViewerPanPointerId = event.pointerId;
+            state.imageViewerPanOrigin = {
+                clientX: event.clientX,
+                clientY: event.clientY,
+                offsetX: state.imageViewerOffsetX,
+                offsetY: state.imageViewerOffsetY,
+            };
+            syncImageViewerStageState();
+        }
+    }
+
+    function handleImageViewerPointerMove(event) {
+        if (!state.imageViewerPointers.has(event.pointerId)) {
+            return;
+        }
+
+        state.imageViewerPointers.set(event.pointerId, {
+            clientX: event.clientX,
+            clientY: event.clientY,
+        });
+
+        if (state.imageViewerPointers.size >= 2) {
+            syncImageViewerPinchZoom();
+            return;
+        }
+
+        if (state.imageViewerPanPointerId !== event.pointerId || !state.imageViewerPanOrigin || state.imageViewerZoom <= 1) {
+            return;
+        }
+
+        event.preventDefault();
+        state.imageViewerOffsetX = state.imageViewerPanOrigin.offsetX + (event.clientX - state.imageViewerPanOrigin.clientX);
+        state.imageViewerOffsetY = state.imageViewerPanOrigin.offsetY + (event.clientY - state.imageViewerPanOrigin.clientY);
+        applyImageViewerTransform();
+    }
+
+    function handleImageViewerPointerEnd(event) {
+        if (!state.imageViewerPointers.has(event.pointerId)) {
+            return;
+        }
+
+        state.imageViewerPointers.delete(event.pointerId);
+        try {
+            imageViewerStage.releasePointerCapture?.(event.pointerId);
+        } catch (error) {
+            // Ignore stale pointer captures when the interaction already ended elsewhere.
+        }
+
+        if (state.imageViewerPointers.size < 2) {
+            state.imageViewerPinchDistance = null;
+        }
+
+        if (state.imageViewerPointers.size === 1 && state.imageViewerZoom > 1) {
+            const [[pointerId, pointer]] = getActiveImageViewerPointers();
+            state.imageViewerPanPointerId = pointerId;
+            state.imageViewerPanOrigin = {
+                clientX: pointer.clientX,
+                clientY: pointer.clientY,
+                offsetX: state.imageViewerOffsetX,
+                offsetY: state.imageViewerOffsetY,
+            };
+        } else {
+            state.imageViewerPanPointerId = null;
+            state.imageViewerPanOrigin = null;
+        }
+
+        syncImageViewerStageState();
+    }
+
+    function handleImageViewerKeydown(event) {
+        if (!isImageViewerOpen()) {
+            return;
+        }
+
+        if (event.key === "+" || event.key === "=" || event.key === "Add") {
+            event.preventDefault();
+            zoomImageViewerBy(1.2);
+            return;
+        }
+
+        if (event.key === "-" || event.key === "_" || event.key === "Subtract") {
+            event.preventDefault();
+            zoomImageViewerBy(1 / 1.2);
+            return;
+        }
+
+        if (event.key === "0") {
+            event.preventDefault();
+            setImageViewerZoom(1);
+        }
+    }
+
     function closeImageViewer() {
         state.imageViewerContext = null;
+        resetImageViewerTransform();
         imageViewerImage.removeAttribute("src");
         imageViewerImage.alt = "";
         imageViewerDownload.removeAttribute("href");
@@ -1091,6 +1443,7 @@ if (appNode) {
             return;
         }
 
+        resetImageViewerTransform();
         state.imageViewerContext = allowRemove
             ? { imageKind, imageId }
             : null;
@@ -1103,6 +1456,9 @@ if (appNode) {
         imageViewerRemoveButton.dataset.imageKind = allowRemove ? imageKind : "";
         imageViewerRemoveButton.dataset.imageId = allowRemove ? imageId : "";
         openModal(imageViewerModal);
+        if (imageViewerImage.complete && imageViewerImage.naturalWidth) {
+            handleImageViewerLoad();
+        }
     }
 
     function openImageViewerFromTrigger(trigger) {

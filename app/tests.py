@@ -970,6 +970,66 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(response.json()['trade']['screenshot_count'], 1)
         self.assertEqual(response.json()['trade']['screenshots'][0]['id'], str(screenshot_b.pk))
 
+    def test_dashboard_payload_allows_editing_legacy_trade_without_ratio_and_gp(self):
+        account = self.get_active_account()
+        trade = Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.now(),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result='',
+            setup='Legacy setup',
+            entry_price=Decimal('1.0000'),
+            exit_price=Decimal('6.0000'),
+            quantity=Decimal('25.00'),
+            lot_size=None,
+            gp_value=None,
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=None,
+            capital_base=account.capital_base,
+            confidence=3,
+            notes='Legacy trade',
+        )
+
+        dashboard_response = self.client.get(reverse('app:dashboard-data'))
+        self.assertEqual(dashboard_response.status_code, 200)
+        trade_payload = dashboard_response.json()['monthly_trades'][0]
+
+        self.assertEqual(trade_payload['id'], trade.id)
+        self.assertEqual(trade_payload['result_code'], Trade.Result.GAIN)
+        self.assertEqual(trade_payload['ratio_value'], '2.50')
+        self.assertEqual(trade_payload['gp_value_value'], '125')
+        self.assertEqual(trade_payload['lot_size_value'], '25')
+
+        update_response = self.client.post(
+            reverse('app:trade-update', args=[trade.pk]),
+            data={
+                'executed_at': trade_payload['executed_at_input'],
+                'symbol': trade_payload['symbol'],
+                'direction': trade_payload['direction_code'],
+                'setup': 'Legacy setup updated',
+                'entry_price': trade_payload['entry_price_value'],
+                'rr_ratio': trade_payload['ratio_value'],
+                'result': trade_payload['result_code'],
+                'lot_size': trade_payload['lot_size_value'],
+                'gp_value': trade_payload['gp_value_value'],
+                'confidence': str(trade.confidence),
+                'notes': 'Legacy updated',
+            },
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        trade.refresh_from_db()
+        self.assertEqual(trade.result, Trade.Result.GAIN)
+        self.assertEqual(trade.rr_ratio, Decimal('2.50'))
+        self.assertEqual(trade.gp_value, Decimal('125.00'))
+        self.assertEqual(trade.lot_size, Decimal('25.00'))
+        self.assertEqual(trade.quantity, Decimal('25.00'))
+        self.assertEqual(trade.notes, 'Legacy updated')
+
     def test_settings_view_updates_preferences(self):
         response = self.client.post(
             reverse('app:settings'),

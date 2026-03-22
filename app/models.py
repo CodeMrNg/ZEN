@@ -183,7 +183,11 @@ class Trade(models.Model):
         if self.result:
             return self.result
         if self.rr_ratio is None:
-            return ''
+            if self.net_pnl > 0:
+                return self.Result.GAIN
+            if self.net_pnl < 0:
+                return self.Result.LOSS
+            return self.Result.BREAK_EVEN
         if self.rr_ratio > 0:
             return self.Result.TAKE_PROFIT
         if self.rr_ratio < 0:

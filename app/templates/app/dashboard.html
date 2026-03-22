@@ -558,6 +558,38 @@
                         <h2 id="image-viewer-title">{% tr 'dashboard.modal.image_preview' 'Apercu image' %}</h2>
                     </div>
                     <div class="image-viewer-actions">
+                        <button
+                            type="button"
+                            class="ghost-button icon-button"
+                            id="image-viewer-zoom-out"
+                            aria-label="{% tr 'dashboard.modal.zoom_out' 'Reduire le zoom' %}"
+                            title="{% tr 'dashboard.modal.zoom_out' 'Reduire le zoom' %}"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 12h12"></path>
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="ghost-button image-viewer-zoom-value"
+                            id="image-viewer-zoom-reset"
+                            aria-label="{% tr 'dashboard.modal.zoom_reset' 'Reinitialiser le zoom' %}"
+                            title="{% tr 'dashboard.modal.zoom_reset' 'Reinitialiser le zoom' %}"
+                        >
+                            <span id="image-viewer-zoom-value">100%</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="ghost-button icon-button"
+                            id="image-viewer-zoom-in"
+                            aria-label="{% tr 'dashboard.modal.zoom_in' 'Augmenter le zoom' %}"
+                            title="{% tr 'dashboard.modal.zoom_in' 'Augmenter le zoom' %}"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 12h12"></path>
+                                <path d="M12 6v12"></path>
+                            </svg>
+                        </button>
                         <a
                             href="#"
                             class="ghost-button icon-button"
@@ -594,8 +626,10 @@
             </div>
 
             <div class="dashboard-modal-body image-viewer-body">
-                <div class="image-viewer-stage">
-                    <img id="image-viewer-image" class="image-viewer-image" alt="">
+                <div class="image-viewer-stage" id="image-viewer-stage" tabindex="0">
+                    <div class="image-viewer-viewport" id="image-viewer-viewport">
+                        <img id="image-viewer-image" class="image-viewer-image" alt="">
+                    </div>
                 </div>
             </div>
         </section>

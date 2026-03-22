@@ -1,0 +1,46 @@
+{% load app_i18n %}
+
+<nav class="sidebar-nav" id="sidebar-primary-nav" aria-label="{% tr 'nav.primary' 'Navigation principale' %}">
+    <a class="nav-item{% if active_page == 'dashboard' %} is-active{% endif %}" href="{% url 'app:dashboard' %}" data-sidebar-nav-link>
+        <span class="nav-item-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+                <path d="M4 5h7v6H4z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M13 5h7v10h-7z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M4 13h7v6H4z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M13 17h7v2h-7z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+            </svg>
+        </span>
+        <span class="nav-item-label">{% tr 'nav.dashboard' 'Dashboard' %}</span>
+    </a>
+
+    <a class="nav-item{% if active_page == 'transactions' %} is-active{% endif %}" href="{% url 'app:transactions' %}" data-sidebar-nav-link>
+        <span class="nav-item-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+                <path d="M7 7h11" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M14 4l4 3-4 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M17 17H6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M10 14l-4 3 4 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+            </svg>
+        </span>
+        <span class="nav-item-label">{% tr 'nav.transactions' 'Transactions' %}</span>
+    </a>
+
+    <a class="nav-item{% if active_page == 'tools' %} is-active{% endif %}" href="{% url 'app:tools' %}" data-sidebar-nav-link>
+        <span class="nav-item-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+                <path d="M14.7 6.3a4 4 0 0 0-5.66 5.66l-4.74 4.74a1 1 0 0 0 0 1.41l1.59 1.59a1 1 0 0 0 1.41 0l4.74-4.74a4 4 0 0 0 5.66-5.66l-2.11 2.12-2.83-2.83z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+            </svg>
+        </span>
+        <span class="nav-item-label">{% tr 'nav.tools' 'Outils' %}</span>
+    </a>
+
+    <a class="nav-item{% if active_page == 'settings' %} is-active{% endif %}" href="{% url 'app:settings' %}" data-sidebar-nav-link>
+        <span class="nav-item-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 9.25a2.75 2.75 0 1 0 0 5.5a2.75 2.75 0 0 0 0-5.5z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.25 1.25 0 0 1 0 1.77l-.67.67a1.25 1.25 0 0 1-1.77 0l-.1-.1a1 1 0 0 0-1.1-.2a1 1 0 0 0-.6.92V20a1.25 1.25 0 0 1-1.25 1.25h-.95A1.25 1.25 0 0 1 11 20v-.15a1 1 0 0 0-.6-.92a1 1 0 0 0-1.1.2l-.1.1a1.25 1.25 0 0 1-1.77 0l-.67-.67a1.25 1.25 0 0 1 0-1.77l.1-.1a1 1 0 0 0 .2-1.1a1 1 0 0 0-.92-.6H4a1.25 1.25 0 0 1-1.25-1.25v-.95A1.25 1.25 0 0 1 4 11h.15a1 1 0 0 0 .92-.6a1 1 0 0 0-.2-1.1l-.1-.1a1.25 1.25 0 0 1 0-1.77l.67-.67a1.25 1.25 0 0 1 1.77 0l.1.1a1 1 0 0 0 1.1.2H8.5A1 1 0 0 0 9.1 6V5a1.25 1.25 0 0 1 1.25-1.25h.95A1.25 1.25 0 0 1 12.55 5v.15a1 1 0 0 0 .6.92a1 1 0 0 0 1.1-.2l.1-.1a1.25 1.25 0 0 1 1.77 0l.67.67a1.25 1.25 0 0 1 0 1.77l-.1.1a1 1 0 0 0-.2 1.1V9.5a1 1 0 0 0 .92.6H20A1.25 1.25 0 0 1 21.25 11v.95A1.25 1.25 0 0 1 20 13.2h-.15a1 1 0 0 0-.45 1.8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"></path>
+            </svg>
+        </span>
+        <span class="nav-item-label">{% tr 'nav.settings' 'Parametres' %}</span>
+    </a>
+</nav>

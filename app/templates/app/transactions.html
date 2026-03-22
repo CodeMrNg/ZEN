@@ -15,24 +15,38 @@
     data-transactions-url="{% url 'app:transactions-data' %}"
     data-movement-url="{% url 'app:capital-movement-create' %}"
 >
-    <aside class="sidebar">
-        <button type="button" class="brand brand-trigger" data-ui-modal-open="account-switcher-modal" aria-label="{% tr 'dashboard.switch_account_aria' 'Changer rapidement de compte de trading' %}">
-            <span class="brand-mark"></span>
-            <div>
-                <strong>ZEN TRADING</strong>
-                <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
-                {% if request.user.is_superuser %}
-                    <span class="brand-admin-badge">{% tr 'common.super_admin' 'Super admin' %}</span>
-                {% endif %}
-            </div>
-        </button>
+    <aside class="sidebar" data-sidebar>
+        <div class="sidebar-topbar">
+            <button type="button" class="brand brand-trigger" data-ui-modal-open="account-switcher-modal" aria-label="{% tr 'dashboard.switch_account_aria' 'Changer rapidement de compte de trading' %}">
+                <span class="brand-mark"></span>
+                <div>
+                    <strong>ZEN TRADING</strong>
+                    <span class="brand-subtitle">{% tr 'brand.subtitle' 'Plateforme de performance' %}</span>
+                    {% if request.user.is_superuser %}
+                        <span class="brand-admin-badge">{% tr 'common.super_admin' 'Super admin' %}</span>
+                    {% endif %}
+                </div>
+            </button>
 
-        <nav class="sidebar-nav">
-            <a class="nav-item" href="{% url 'app:dashboard' %}">{% tr 'nav.dashboard' 'Dashboard' %}</a>
-            <a class="nav-item is-active" href="{% url 'app:transactions' %}">{% tr 'nav.transactions' 'Transactions' %}</a>
-            <a class="nav-item" href="{% url 'app:tools' %}">{% tr 'nav.tools' 'Outils' %}</a>
-            <a class="nav-item" href="{% url 'app:settings' %}">{% tr 'nav.settings' 'Parametres' %}</a>
-        </nav>
+            <button
+                type="button"
+                class="sidebar-menu-toggle"
+                data-sidebar-menu-toggle
+                aria-controls="sidebar-primary-nav"
+                aria-expanded="false"
+                aria-label="{% tr 'nav.open_menu' 'Ouvrir le menu principal' %}"
+                data-open-label="{% tr 'nav.open_menu' 'Ouvrir le menu principal' %}"
+                data-close-label="{% tr 'nav.close_menu' 'Fermer le menu principal' %}"
+            >
+                <span class="sidebar-menu-toggle-lines" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+        </div>
+
+        {% include 'app/includes/sidebar_nav.html' with active_page='transactions' only %}
 
         <article class="sidebar-card">
             <span>{% tr 'transactions.sidebar.current_capital' 'Capital actuel' %}</span>

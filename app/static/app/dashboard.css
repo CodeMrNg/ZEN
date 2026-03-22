@@ -3861,7 +3861,105 @@ button {
     }
 
     .calendar-main {
-        min-width: 640px;
+        min-width: 0;
+    }
+
+    .calendar-shell,
+    .calendar-shell-expanded {
+        overflow: visible;
+        padding-bottom: 0;
+    }
+
+    .calendar-weekdays,
+    .calendar-grid {
+        gap: 6px;
+    }
+
+    .calendar-weekdays span {
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+    }
+
+    .calendar-cell {
+        min-height: 0;
+        aspect-ratio: 1 / 1.08;
+        padding: 5px 4px;
+        border-radius: 18px;
+        align-content: center;
+        justify-items: center;
+        gap: 4px;
+        text-align: center;
+    }
+
+    .calendar-cell-top {
+        width: 100%;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .calendar-cell-trades,
+    .calendar-cell-subtitle {
+        display: none;
+    }
+
+    .calendar-cell-day {
+        display: block;
+        width: 100%;
+        font-size: 0.76rem;
+        line-height: 1;
+        text-align: center;
+    }
+
+    .calendar-cell-value {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: auto;
+        max-width: 100%;
+        padding-inline: 2px;
+        font-family: "Manrope", sans-serif;
+        font-size: clamp(0.6rem, 2.05vw, 0.82rem);
+        font-weight: 800;
+        line-height: 1.15;
+        letter-spacing: 0;
+        font-variant-numeric: lining-nums tabular-nums;
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .calendar-cell.is-profit {
+        background: linear-gradient(180deg, rgba(16, 72, 80, 0.92), rgba(10, 44, 49, 0.96));
+        border-color: rgba(88, 231, 195, 0.22);
+    }
+
+    .calendar-cell.is-loss {
+        background: linear-gradient(180deg, rgba(110, 36, 79, 0.92), rgba(61, 20, 47, 0.96));
+        border-color: rgba(255, 112, 152, 0.22);
+    }
+
+    .calendar-cell.is-profit .calendar-cell-value {
+        color: #a8f8a8;
+    }
+
+    .calendar-cell.is-loss .calendar-cell-value {
+        color: #ff7ca8;
+    }
+
+    .calendar-cell.is-other {
+        opacity: 0;
+        border-color: transparent;
+        background: transparent;
+    }
+
+    .calendar-weeks {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .week-summary {
+        padding: 12px;
+        border-radius: 16px;
     }
 
     .image-preview-tile {
@@ -3878,11 +3976,6 @@ button {
 
     .detail-image-tile.is-primary {
         flex-basis: 240px;
-    }
-
-    .calendar-cell {
-        min-height: 92px;
-        padding: 10px;
     }
 
     .chart-area-medium {
@@ -4002,7 +4095,7 @@ button {
     }
 
     .calendar-main {
-        min-width: 560px;
+        min-width: 0;
     }
 
     .calendar-weekdays span,
@@ -4011,15 +4104,28 @@ button {
         font-size: 0.7rem;
     }
 
-    .calendar-cell {
-        min-height: 84px;
-        padding: 8px;
-        border-radius: 14px;
+    .calendar-weekdays,
+    .calendar-grid {
+        gap: 4px;
     }
 
-    .calendar-cell-day,
+    .calendar-cell {
+        min-height: 0;
+        padding: 4px 3px;
+        border-radius: 16px;
+    }
+
+    .calendar-cell-day {
+        font-size: 0.68rem;
+    }
+
     .calendar-cell-value {
-        font-size: 0.82rem;
+        font-size: clamp(0.5rem, 2.35vw, 0.68rem);
+        line-height: 1.12;
+    }
+
+    .calendar-weeks {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .recent-trade .trade-image-frame,

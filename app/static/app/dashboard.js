@@ -1557,6 +1557,10 @@ if (appNode) {
         return values.length ? values : [0];
     }
 
+    function trimCalendarAmount(value) {
+        return String(value ?? "").replace(/([.,])00(?=(?:\s*[^\d\s]+)?\s*$)/, "");
+    }
+
     function buildCalendarMarkup(calendar) {
         const gridHtml = calendar.rows.map((row) => {
             return row.map((day) => {
@@ -1564,6 +1568,7 @@ if (appNode) {
                 const otherClass = day.in_month ? "" : "is-other";
                 const clickableClass = day.in_month && day.trade_count ? "is-clickable" : "";
                 const subtitle = day.trade_count ? `${day.trade_count} ${strings.dayTradeCountSuffix}` : strings.noExecution;
+                const pnlLabel = trimCalendarAmount(day.pnl_formatted);
 
                 if (day.in_month && day.trade_count) {
                     return `
@@ -1573,7 +1578,7 @@ if (appNode) {
                                 <span class="calendar-cell-trades">${day.trade_count || ""}</span>
                             </div>
                             <div>
-                                <strong class="calendar-cell-value">${day.pnl_formatted}</strong>
+                                <strong class="calendar-cell-value">${pnlLabel}</strong>
                                 <div class="calendar-cell-subtitle">${subtitle}</div>
                             </div>
                         </button>
@@ -1587,7 +1592,7 @@ if (appNode) {
                             <span class="calendar-cell-trades">${day.trade_count || ""}</span>
                         </div>
                         <div>
-                            <strong class="calendar-cell-value">${day.in_month ? day.pnl_formatted : ""}</strong>
+                            <strong class="calendar-cell-value">${day.in_month ? pnlLabel : ""}</strong>
                             <div class="calendar-cell-subtitle">${day.in_month ? subtitle : ""}</div>
                         </div>
                     </article>
@@ -1599,7 +1604,7 @@ if (appNode) {
             return `
                 <article class="week-summary ${week.tone}">
                     <span>${week.label}</span>
-                    <strong>${week.pnl_formatted}</strong>
+                    <strong>${trimCalendarAmount(week.pnl_formatted)}</strong>
                     <p>${week.active_days} jour(s) actifs</p>
                 </article>
             `;

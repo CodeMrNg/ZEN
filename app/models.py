@@ -31,8 +31,10 @@ class Trade(models.Model):
 
     class Result(models.TextChoices):
         TAKE_PROFIT = 'TAKE_PROFIT', 'Take profit'
+        GAIN = 'GAIN', 'Gain'
         BREAK_EVEN = 'BREAK_EVEN', 'Break even'
         STOP_LOSS = 'STOP_LOSS', 'Stoploss'
+        LOSS = 'LOSS', 'Perte'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -142,6 +144,8 @@ class Trade(models.Model):
 
     @property
     def gross_pnl(self):
+        if self.result == self.Result.BREAK_EVEN and self.gp_value is not None:
+            return self.gp_value
         if self.rr_ratio is not None and self.risk_amount is not None:
             return self.risk_amount * self.rr_ratio
         price_delta = self.exit_price - self.entry_price

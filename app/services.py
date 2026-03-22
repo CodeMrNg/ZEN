@@ -553,6 +553,13 @@ def serialize_trade(trade, currency='USD', language=None):
     screenshots = serialize_trade_screenshots(trade)
     screenshot_urls = [item['url'] for item in screenshots]
     screenshot_url = screenshot_urls[0] if screenshot_urls else None
+    result_label_map = {
+        Trade.Result.TAKE_PROFIT: tr('trade.result.take_profit', language=language, default='Take profit'),
+        Trade.Result.GAIN: tr('trade.result.gain', language=language, default='Gain'),
+        Trade.Result.BREAK_EVEN: tr('trade.result.break_even', language=language, default='Break even'),
+        Trade.Result.STOP_LOSS: tr('trade.result.stop_loss', language=language, default='Stoploss'),
+        Trade.Result.LOSS: tr('trade.result.loss', language=language, default='Perte'),
+    }
     capital_change_percent = (
         (trade.net_pnl / trade.capital_base * Decimal('100'))
         if trade.capital_base
@@ -566,7 +573,7 @@ def serialize_trade(trade, currency='USD', language=None):
         'direction_code': trade.direction,
         'result': trade.resolved_result,
         'result_code': trade.resolved_result,
-        'result_label': trade.resolved_result_label,
+        'result_label': result_label_map.get(trade.resolved_result, trade.resolved_result_label),
         'setup': trade.setup,
         'market': trade.market or 'Spot',
         'executed_at': executed_at.isoformat(),

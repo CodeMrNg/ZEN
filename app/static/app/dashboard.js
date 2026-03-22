@@ -501,41 +501,62 @@ if (appNode) {
         capitalHint.textContent = `${capitalContext.label} ${capitalContext.formatted}.`;
     }
 
+    function getSignedCapitalImpactValue(rawValue, result) {
+        if (!Number.isFinite(rawValue)) {
+            return Number.NaN;
+        }
+
+        if (result === "STOP_LOSS" || result === "LOSS") {
+            return -Math.abs(rawValue);
+        }
+
+        if (result === "TAKE_PROFIT" || result === "GAIN") {
+            return Math.abs(rawValue);
+        }
+
+        return rawValue;
+    }
+
     function updateCapitalImpactPreview() {
         if (!capitalImpactPercent || !capitalImpactLabel) {
             return;
         }
 
         const capitalBase = getPreviewCapitalContext().value;
-        const gpValue = Number.parseFloat(gpValueInput?.value || "");
+        const rawGpValue = Number.parseFloat(gpValueInput?.value || "");
         const result = resultInput?.value || "TAKE_PROFIT";
 
-        if (result === "BREAK_EVEN") {
-            capitalImpactLabel.textContent = strings.impactCapital;
-            capitalImpactPercent.textContent = "0.00%";
-            capitalImpactPercent.className = "field-static-value is-flat";
-            return;
-        }
-
-        if (!Number.isFinite(capitalBase) || capitalBase <= 0 || !Number.isFinite(gpValue)) {
-            capitalImpactLabel.textContent = result === "STOP_LOSS" ? strings.lossCapital : strings.gainCapital;
+        if (!Number.isFinite(capitalBase) || capitalBase <= 0 || !Number.isFinite(rawGpValue)) {
+            capitalImpactLabel.textContent = result === "STOP_LOSS" || result === "LOSS"
+                ? strings.lossCapital
+                : result === "TAKE_PROFIT" || result === "GAIN"
+                    ? strings.gainCapital
+                    : strings.impactCapital;
             capitalImpactPercent.textContent = "--";
-            capitalImpactPercent.className = `field-static-value ${result === "STOP_LOSS" ? "is-loss" : "is-profit"}`;
+            capitalImpactPercent.className = `field-static-value ${result === "STOP_LOSS" || result === "LOSS" ? "is-loss" : result === "TAKE_PROFIT" || result === "GAIN" ? "is-profit" : "is-flat"}`;
             return;
         }
 
-        const capitalPercent = (Math.abs(gpValue) / capitalBase) * 100;
+        const signedGpValue = getSignedCapitalImpactValue(rawGpValue, result);
+        const capitalPercent = (Math.abs(signedGpValue) / capitalBase) * 100;
 
-        if (result === "STOP_LOSS") {
+        if (signedGpValue < 0) {
             capitalImpactLabel.textContent = strings.lossCapital;
             capitalImpactPercent.textContent = `-${capitalPercent.toFixed(2)}%`;
             capitalImpactPercent.className = "field-static-value is-loss";
             return;
         }
 
-        capitalImpactLabel.textContent = strings.gainCapital;
-        capitalImpactPercent.textContent = `+${capitalPercent.toFixed(2)}%`;
-        capitalImpactPercent.className = "field-static-value is-profit";
+        if (signedGpValue > 0) {
+            capitalImpactLabel.textContent = strings.gainCapital;
+            capitalImpactPercent.textContent = `+${capitalPercent.toFixed(2)}%`;
+            capitalImpactPercent.className = "field-static-value is-profit";
+            return;
+        }
+
+        capitalImpactLabel.textContent = strings.impactCapital;
+        capitalImpactPercent.textContent = "0.00%";
+        capitalImpactPercent.className = "field-static-value is-flat";
     }
 
     function applyTradeDefaults(overwrite = true) {
@@ -935,6 +956,14 @@ if (appNode) {
         return local.toISOString().slice(0, 16);
     }
 
+    function getEditableGpValue(trade) {
+        if (trade.result_code === "BREAK_EVEN" || trade.result === "BREAK_EVEN") {
+            return trade.gp_value == null ? "" : String(trade.gp_value);
+        }
+
+        return trade.gp_value_value ?? (trade.gp_value == null ? "" : String(Math.abs(trade.gp_value)));
+    }
+
     function fillTradeForm(trade) {
         if (!trade) {
             return;
@@ -955,7 +984,7 @@ if (appNode) {
         confidenceInput.value = String(trade.confidence_value || trade.confidence || "3");
         ratioInput.value = trade.ratio_value ?? (trade.ratio == null ? "" : String(Math.abs(trade.ratio)));
         lotSizeInput.value = trade.lot_size_value ?? (trade.lot_size == null ? "" : String(trade.lot_size));
-        gpValueInput.value = trade.gp_value_value ?? (trade.gp_value == null ? "" : String(Math.abs(trade.gp_value)));
+        gpValueInput.value = getEditableGpValue(trade);
         document.getElementById("notes").value = trade.notes || "";
         screenshotInput.value = "";
         showExistingImagePreview(getTradeScreenshots(trade));

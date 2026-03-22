@@ -272,21 +272,21 @@ class TradeCreateForm(forms.ModelForm):
         result = cleaned_data.get('result')
         rr_ratio = cleaned_data.get('rr_ratio')
         gp_value = cleaned_data.get('gp_value')
+        profit_results = {Trade.Result.TAKE_PROFIT, Trade.Result.GAIN}
+        loss_results = {Trade.Result.STOP_LOSS, Trade.Result.LOSS}
 
         if rr_ratio is not None:
-            if result == Trade.Result.TAKE_PROFIT:
+            if result in profit_results:
                 cleaned_data['rr_ratio'] = abs(rr_ratio)
-            elif result == Trade.Result.STOP_LOSS:
+            elif result in loss_results:
                 cleaned_data['rr_ratio'] = -abs(rr_ratio)
             elif result == Trade.Result.BREAK_EVEN:
                 cleaned_data['rr_ratio'] = Decimal('0.00')
 
-        if result == Trade.Result.BREAK_EVEN:
-            cleaned_data['gp_value'] = Decimal('0.00')
-        elif gp_value is not None:
-            if result == Trade.Result.TAKE_PROFIT:
+        if gp_value is not None:
+            if result in profit_results:
                 cleaned_data['gp_value'] = abs(gp_value)
-            elif result == Trade.Result.STOP_LOSS:
+            elif result in loss_results:
                 cleaned_data['gp_value'] = -abs(gp_value)
 
         if result != Trade.Result.BREAK_EVEN and cleaned_data.get('gp_value') is None:

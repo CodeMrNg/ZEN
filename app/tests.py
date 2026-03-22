@@ -348,10 +348,42 @@ class TradingJournalApiTests(TestCase):
         trade_payload = response.json()['recent_trades'][0]
         self.assertEqual(trade_payload['direction_code'], 'SHORT')
         self.assertEqual(trade_payload['result_code'], 'STOP_LOSS')
+        self.assertEqual(trade_payload['result_label'], 'Stoploss')
         self.assertEqual(trade_payload['entry_price_value'], '3020.5000')
         self.assertEqual(trade_payload['ratio_value'], '1.50')
         self.assertEqual(trade_payload['gp_value_value'], '150.00')
         self.assertEqual(trade_payload['lot_size_value'], '2.00')
+
+    def test_dashboard_api_applies_break_even_gp_value_to_capital_metrics(self):
+        account = self.get_active_account()
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.now(),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.BREAK_EVEN,
+            setup='Runner closed late',
+            entry_price=Decimal('3020.5000'),
+            rr_ratio=Decimal('0.00'),
+            exit_price=Decimal('3020.5000'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('80.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('0.00'),
+            risk_percent=Decimal('0.00'),
+            capital_base=Decimal('10000.00'),
+            confidence=4,
+        )
+
+        response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['recent_trades'][0]['capital_change_percent_label'], '+0.80%')
+        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,080.00')
 
     def test_trade_creation_api_creates_trade(self):
         TradingPreference.objects.update_or_create(
@@ -398,6 +430,108 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(trade.risk_amount, Decimal('250.00'))
         self.assertEqual(trade.risk_percent, Decimal('1.00'))
         self.assertEqual(trade.screenshots.count(), 2)
+
+    def test_trade_creation_api_allows_positive_break_even_capital_gain(self):
+        TradingPreference.objects.update_or_create(
+            user=self.user,
+            defaults={
+                'capital_base': Decimal('10000.00'),
+                'default_symbol': 'XAUUSD',
+            },
+        )
+        payload = {
+            'executed_at': '2026-03-20T10:30',
+            'symbol': 'xauusd',
+            'direction': 'LONG',
+            'setup': 'Partial runner',
+            'entry_price': '3020.5000',
+            'rr_ratio': '1.20',
+            'result': 'BREAK_EVEN',
+            'lot_size': '1.00',
+            'gp_value': '150.00',
+            'confidence': 4,
+            'notes': 'Break even positif',
+        }
+
+        response = self.client.post(reverse('app:trade-create'), data=payload)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['trade']['capital_change_percent_label'], '+1.50%')
+        trade = Trade.objects.get(symbol='XAUUSD', setup='Partial runner')
+        self.assertEqual(trade.result, Trade.Result.BREAK_EVEN)
+        self.assertEqual(trade.rr_ratio, Decimal('0.00'))
+        self.assertEqual(trade.gp_value, Decimal('150.00'))
+        self.assertEqual(trade.risk_amount, Decimal('0.00'))
+        self.assertEqual(trade.risk_percent, Decimal('0.00'))
+        self.assertEqual(trade.net_pnl, Decimal('150.00'))
+
+    def test_trade_creation_api_accepts_gain_result(self):
+        TradingPreference.objects.update_or_create(
+            user=self.user,
+            defaults={
+                'capital_base': Decimal('10000.00'),
+                'default_symbol': 'XAUUSD',
+            },
+        )
+        payload = {
+            'executed_at': '2026-03-20T10:30',
+            'symbol': 'xauusd',
+            'direction': 'LONG',
+            'setup': 'Momentum follow-through',
+            'entry_price': '3020.5000',
+            'rr_ratio': '2.50',
+            'result': 'GAIN',
+            'lot_size': '1.00',
+            'gp_value': '250.00',
+            'confidence': 4,
+            'notes': 'Gain manuel',
+        }
+
+        response = self.client.post(reverse('app:trade-create'), data=payload)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['trade']['result_code'], 'GAIN')
+        self.assertEqual(response.json()['trade']['result_label'], 'Gain')
+        self.assertEqual(response.json()['trade']['capital_change_percent_label'], '+2.50%')
+        trade = Trade.objects.get(symbol='XAUUSD', setup='Momentum follow-through')
+        self.assertEqual(trade.result, Trade.Result.GAIN)
+        self.assertEqual(trade.rr_ratio, Decimal('2.50'))
+        self.assertEqual(trade.gp_value, Decimal('250.00'))
+        self.assertEqual(trade.risk_amount, Decimal('100.00'))
+
+    def test_trade_creation_api_accepts_loss_result(self):
+        TradingPreference.objects.update_or_create(
+            user=self.user,
+            defaults={
+                'capital_base': Decimal('10000.00'),
+                'default_symbol': 'XAUUSD',
+            },
+        )
+        payload = {
+            'executed_at': '2026-03-20T10:30',
+            'symbol': 'xauusd',
+            'direction': 'LONG',
+            'setup': 'Loss manuel',
+            'entry_price': '3020.5000',
+            'rr_ratio': '2.50',
+            'result': 'LOSS',
+            'lot_size': '1.00',
+            'gp_value': '250.00',
+            'confidence': 4,
+            'notes': 'Perte manuelle',
+        }
+
+        response = self.client.post(reverse('app:trade-create'), data=payload)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['trade']['result_code'], 'LOSS')
+        self.assertEqual(response.json()['trade']['result_label'], 'Perte')
+        self.assertEqual(response.json()['trade']['capital_change_percent_label'], '-2.50%')
+        trade = Trade.objects.get(symbol='XAUUSD', setup='Loss manuel')
+        self.assertEqual(trade.result, Trade.Result.LOSS)
+        self.assertEqual(trade.rr_ratio, Decimal('-2.50'))
+        self.assertEqual(trade.gp_value, Decimal('-250.00'))
+        self.assertEqual(trade.risk_amount, Decimal('100.00'))
 
     def test_dashboard_api_serializes_trade_gallery(self):
         trade = self.create_trade()

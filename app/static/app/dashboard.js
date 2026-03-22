@@ -212,6 +212,7 @@ if (appNode) {
     };
 
     const metricsGrid = document.getElementById("metrics-grid");
+    const yearSelector = document.getElementById("year-selector");
     const monthSelector = document.getElementById("month-selector");
     const flashMessage = document.getElementById("flash-message");
     const pageLoader = document.getElementById("dashboard-loader");
@@ -282,12 +283,18 @@ if (appNode) {
     });
 
     function bindEvents() {
+        if (yearSelector) {
+            yearSelector.addEventListener("change", () => {
+                loadDashboard("", yearSelector.value);
+            });
+        }
+
         monthSelector.addEventListener("change", () => {
-            loadDashboard(monthSelector.value);
+            loadDashboard(monthSelector.value, yearSelector?.value || "");
         });
 
         refreshButton.addEventListener("click", () => {
-            loadDashboard(monthSelector.value);
+            loadDashboard(monthSelector.value, yearSelector?.value || "");
         });
 
         if (demoButton) {
@@ -1252,7 +1259,7 @@ if (appNode) {
         togglePageLoader(pageLoader, isBusy, loaderMessage);
     }
 
-    async function loadDashboard(month = "") {
+    async function loadDashboard(month = "", year = "") {
         if (state.controller) {
             state.controller.abort();
         }
@@ -1265,6 +1272,9 @@ if (appNode) {
             const url = new URL(endpoints.dashboard, window.location.origin);
             if (month) {
                 url.searchParams.set("month", month);
+            }
+            if (year) {
+                url.searchParams.set("year", year);
             }
 
             const response = await fetch(url, {
@@ -1297,6 +1307,7 @@ if (appNode) {
         state.lastPayload = payload;
         state.preferences = payload.preferences || state.preferences;
         indexPayloadDetails(payload);
+        renderYearOptions(payload.available_years || [], payload.summary.selected_year);
         renderMonthOptions(payload.available_months, payload.summary.selected_month);
         renderOverview(payload.overview, payload.summary.selected_month_label);
         renderMetrics(payload.metrics);
@@ -1362,6 +1373,17 @@ if (appNode) {
 
     function renderMonthOptions(options, selectedValue) {
         monthSelector.innerHTML = options.map((option) => {
+            const selected = option.value === selectedValue ? "selected" : "";
+            return `<option value="${option.value}" ${selected}>${option.label}</option>`;
+        }).join("");
+    }
+
+    function renderYearOptions(options, selectedValue) {
+        if (!yearSelector) {
+            return;
+        }
+
+        yearSelector.innerHTML = options.map((option) => {
             const selected = option.value === selectedValue ? "selected" : "";
             return `<option value="${option.value}" ${selected}>${option.label}</option>`;
         }).join("");

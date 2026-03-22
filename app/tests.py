@@ -1,6 +1,6 @@
 import shutil
 import tempfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -239,6 +239,101 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['recent_trades'][0]['setup'], 'Trade 7')
         self.assertEqual(payload['recent_trades'][-1]['setup'], 'Trade 3')
 
+    def test_dashboard_api_exposes_only_current_year_when_no_previous_trades_exist(self):
+        self.get_active_account()
+
+        response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        current_year = str(timezone.localdate().year)
+        self.assertEqual(payload['available_years'], [{'value': current_year, 'label': current_year}])
+        self.assertEqual(payload['summary']['selected_year'], current_year)
+
+    def test_dashboard_api_uses_saved_default_dashboard_year_when_available(self):
+        account = self.get_active_account()
+        current_year = timezone.localdate().year
+        previous_year = current_year - 1
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(previous_year, 11, 12, 10, 30)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Previous year trade',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('1.50'),
+            exit_price=Decimal('1.1000'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('100.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=Decimal('0.50'),
+            capital_base=Decimal('10000.00'),
+            confidence=4,
+        )
+        preferences = TradingPreference.objects.get(user=self.user)
+        preferences.default_dashboard_year = previous_year
+        preferences.save(update_fields=['default_dashboard_year', 'updated_at'])
+
+        response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['summary']['selected_year'], str(previous_year))
+        self.assertEqual(payload['available_years'][0]['value'], str(current_year))
+        self.assertEqual(payload['available_years'][1]['value'], str(previous_year))
+        self.assertTrue(all(option['value'].startswith(f'{previous_year}-') for option in payload['available_months']))
+
+    def test_settings_view_saves_default_dashboard_year_when_previous_year_exists(self):
+        account = self.get_active_account()
+        previous_year = timezone.localdate().year - 1
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(previous_year, 9, 5, 8, 0)),
+            symbol='NAS100',
+            market='Indices',
+            direction=Trade.Direction.SHORT,
+            result=Trade.Result.STOP_LOSS,
+            setup='Archived year trade',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('-1.00'),
+            exit_price=Decimal('1.1000'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('-50.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=Decimal('0.50'),
+            capital_base=Decimal('10000.00'),
+            confidence=3,
+        )
+
+        response = self.client.post(
+            reverse('app:settings'),
+            data={
+                'action': 'preferences',
+                'ui_language': 'fr',
+                'default_symbol': 'eurusd',
+                'default_direction': 'SHORT',
+                'default_setup': 'Asia reversal',
+                'default_lot_size': '2.50',
+                'default_fees': '3.75',
+                'default_confidence': '4',
+                'default_dashboard_year': str(previous_year),
+                'capital_base': '25000.00',
+                'currency': 'EUR',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        preferences = TradingPreference.objects.get(user=self.user)
+        self.assertEqual(preferences.default_dashboard_year, previous_year)
+
     def test_settings_preferences_update_user_language_and_cookie(self):
         response = self.client.post(
             reverse('app:settings'),
@@ -251,6 +346,7 @@ class TradingJournalApiTests(TestCase):
                 'default_lot_size': '2.50',
                 'default_fees': '3.75',
                 'default_confidence': '4',
+                'default_dashboard_year': str(timezone.localdate().year),
                 'capital_base': '25000.00',
                 'currency': 'EUR',
             },
@@ -886,6 +982,7 @@ class TradingJournalApiTests(TestCase):
                 'default_lot_size': '2.50',
                 'default_fees': '3.75',
                 'default_confidence': '4',
+                'default_dashboard_year': str(timezone.localdate().year),
                 'capital_base': '25000.00',
                 'currency': 'EUR',
             },

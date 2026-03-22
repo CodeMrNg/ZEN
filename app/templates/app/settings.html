@@ -284,6 +284,17 @@
                             </div>
 
                             <div class="field-group">
+                                <label for="{{ preferences_form.default_dashboard_year.id_for_label }}">{{ preferences_form.default_dashboard_year.label }}</label>
+                                {{ preferences_form.default_dashboard_year }}
+                                <small class="field-help">
+                                    {% tr 'settings.section.default_year_help' 'L annee courante reste disponible par defaut. Les annees precedentes apparaissent seulement si le compte actif contient deja des trades sur ces periodes.' %}
+                                </small>
+                                {% for error in preferences_form.default_dashboard_year.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
                                 <label for="{{ preferences_form.currency.id_for_label }}">{{ preferences_form.currency.label }}</label>
                                 {{ preferences_form.currency }}
                                 {% for error in preferences_form.currency.errors %}

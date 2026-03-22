@@ -24,6 +24,10 @@ def add_calendar_months(value, months=1):
     return value.replace(year=year, month=month, day=day)
 
 
+def current_local_year():
+    return timezone.localdate().year
+
+
 class Trade(models.Model):
     class Direction(models.TextChoices):
         LONG = 'LONG', 'Long'
@@ -296,6 +300,7 @@ class TradingPreference(models.Model):
         choices=settings.LANGUAGES,
         default='fr',
     )
+    default_dashboard_year = models.PositiveSmallIntegerField(default=current_local_year)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

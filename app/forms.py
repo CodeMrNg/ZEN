@@ -3,6 +3,8 @@ from decimal import Decimal
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm, UserCreationForm
 from django.contrib.auth.models import User
+from django.db import models
+from django.utils import timezone
 
 from .formatting import format_decimal_compact
 from .localization import normalize_language, translate
@@ -345,6 +347,11 @@ class TradeCreateForm(forms.ModelForm):
 
 
 class TradingPreferenceForm(forms.ModelForm):
+    default_dashboard_year = forms.TypedChoiceField(
+        label='Annee dashboard par defaut',
+        coerce=int,
+    )
+
     class Meta:
         model = TradingPreference
         fields = (
@@ -355,6 +362,7 @@ class TradingPreferenceForm(forms.ModelForm):
             'default_lot_size',
             'default_fees',
             'default_confidence',
+            'default_dashboard_year',
             'capital_base',
             'currency',
         )
@@ -365,6 +373,7 @@ class TradingPreferenceForm(forms.ModelForm):
             'default_lot_size': 'Quantite par defaut (lots)',
             'default_fees': 'G/P par defaut',
             'default_confidence': 'Confiance par defaut',
+            'default_dashboard_year': 'Annee dashboard par defaut',
             'capital_base': 'Capital initial du compte actif',
             'currency': 'Devise du compte actif',
         }
@@ -375,9 +384,18 @@ class TradingPreferenceForm(forms.ModelForm):
         apply_compact_decimal_widgets(self)
         remove_autofocus_from_fields(self)
         active_account = getattr(self.instance, 'active_account', None)
+        year_choices = self._build_dashboard_year_choices(active_account)
+        self.fields['default_dashboard_year'].choices = year_choices
+        self.fields['default_dashboard_year'].widget.choices = year_choices
         if active_account and not self.is_bound:
             self.fields['capital_base'].initial = active_account.capital_base
             self.fields['currency'].initial = active_account.currency
+        available_year_values = [value for value, _ in year_choices]
+        default_year = getattr(self.instance, 'default_dashboard_year', None) or timezone.localdate().year
+        if default_year not in available_year_values:
+            default_year = timezone.localdate().year if timezone.localdate().year in available_year_values else available_year_values[0]
+        if not self.is_bound:
+            self.fields['default_dashboard_year'].initial = default_year
         self.fields['ui_language'].label = tr(self.language, 'language.title', "Langue de l'application")
         self.fields['default_symbol'].label = tr(self.language, 'form.preferences.default_symbol', 'Paire par defaut')
         self.fields['default_direction'].label = tr(self.language, 'form.preferences.default_direction', 'Direction par defaut')
@@ -385,6 +403,7 @@ class TradingPreferenceForm(forms.ModelForm):
         self.fields['default_lot_size'].label = tr(self.language, 'form.preferences.default_lots', 'Quantite par defaut (lots)')
         self.fields['default_fees'].label = tr(self.language, 'form.preferences.default_gp', 'G/P par defaut')
         self.fields['default_confidence'].label = tr(self.language, 'form.preferences.default_confidence', 'Confiance par defaut')
+        self.fields['default_dashboard_year'].label = tr(self.language, 'form.preferences.default_dashboard_year', 'Annee dashboard par defaut')
         self.fields['capital_base'].label = tr(self.language, 'form.preferences.active_initial_capital', 'Capital initial du compte actif')
         self.fields['currency'].label = tr(self.language, 'form.preferences.active_currency', 'Devise du compte actif')
         apply_choice_labels(
@@ -435,6 +454,16 @@ class TradingPreferenceForm(forms.ModelForm):
 
     def clean_default_symbol(self):
         return self.cleaned_data['default_symbol'].upper().strip()
+
+    def _build_dashboard_year_choices(self, active_account):
+        current_year = timezone.localdate().year
+        years = {current_year}
+        trade_query = Trade.objects.filter(user=self.instance.user) if getattr(self.instance, 'user_id', None) else Trade.objects.none()
+        if active_account:
+            trade_query = trade_query.filter(models.Q(account=active_account) | models.Q(account__isnull=True))
+        for executed_at in trade_query.values_list('executed_at', flat=True):
+            years.add(timezone.localtime(executed_at).year)
+        return [(year, str(year)) for year in sorted(years, reverse=True)]
 
 
 class BaseTradingAccountForm(forms.ModelForm):

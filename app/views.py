@@ -522,6 +522,7 @@ async def dashboard_data_view(request):
     payload = await sync_to_async(build_dashboard_payload_for_user)(
         user.pk,
         request.GET.get('month'),
+        request.GET.get('year'),
         language,
     )
     return JsonResponse(payload)

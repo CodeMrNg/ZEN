@@ -150,19 +150,48 @@ def format_short_day(day):
     return day.strftime('%d/%m')
 
 
-def resolve_selected_month(raw_month, all_trades):
+def get_available_dashboard_years(all_trades):
+    years = {timezone.localdate().year}
+    years.update(timezone.localtime(trade.executed_at).year for trade in all_trades)
+    return sorted(years, reverse=True)
+
+
+def resolve_selected_year(raw_year, raw_month, preferences, available_years):
+    if raw_month:
+        parsed_month = parse_date(f'{raw_month}-01')
+        if parsed_month and parsed_month.year in available_years:
+            return parsed_month.year
+
+    if raw_year:
+        try:
+            parsed_year = int(raw_year)
+        except (TypeError, ValueError):
+            parsed_year = None
+        if parsed_year in available_years:
+            return parsed_year
+
+    preferred_year = getattr(preferences, 'default_dashboard_year', None) or timezone.localdate().year
+    if preferred_year in available_years:
+        return preferred_year
+
+    return available_years[0] if available_years else timezone.localdate().year
+
+
+def resolve_selected_month(raw_month, selected_year, year_trades):
     if raw_month:
         parsed = parse_date(f'{raw_month}-01')
-        if parsed:
-            return parsed.year, parsed.month
+        if parsed and parsed.year == selected_year:
+            return parsed.month
 
-    if all_trades:
-        latest_trade = max(all_trades, key=lambda trade: trade.executed_at)
+    if year_trades:
+        latest_trade = max(year_trades, key=lambda trade: trade.executed_at)
         latest_date = timezone.localtime(latest_trade.executed_at).date()
-        return latest_date.year, latest_date.month
+        return latest_date.month
 
     today = timezone.localdate()
-    return today.year, today.month
+    if selected_year == today.year:
+        return today.month
+    return 1
 
 
 def compute_drawdown(cumulative_values):
@@ -440,6 +469,7 @@ def serialize_preferences(preferences, current_capital=None, account=None, langu
         'default_gp_value': format_decimal_compact(preferences.default_fees),
         'default_fees': format_decimal_compact(preferences.default_fees),
         'default_confidence': preferences.default_confidence,
+        'default_dashboard_year': str(preferences.default_dashboard_year),
         'capital_base': format_decimal_compact(capital_base),
         'capital_base_formatted': format_currency(capital_base, currency),
         'current_capital': format_decimal_compact(current_capital),
@@ -660,7 +690,7 @@ def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_da
     }
 
 
-def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
+def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, language=None):
     language = normalize_language(language)
     preferences = get_or_create_preferences_for_user(user_id)
     active_account = get_or_create_active_account_for_user(user_id, preferences)
@@ -682,26 +712,32 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
         .select_related('user')
         .order_by('occurred_at', 'created_at')
     )
-    year, month = resolve_selected_month(raw_month, trades)
+    available_years = get_available_dashboard_years(trades)
+    year = resolve_selected_year(raw_year, raw_month, preferences, available_years)
+    year_trades = [
+        trade for trade in trades
+        if timezone.localtime(trade.executed_at).year == year
+    ]
+    month = resolve_selected_month(raw_month, year, year_trades)
 
     filtered_trades = []
-    for trade in trades:
+    for trade in year_trades:
         local_executed_at = timezone.localtime(trade.executed_at)
-        if local_executed_at.year == year and local_executed_at.month == month:
+        if local_executed_at.month == month:
             filtered_trades.append(trade)
 
     available_months = []
     seen_months = set()
-    for trade in sorted(trades, key=lambda value: value.executed_at, reverse=True):
+    for trade in sorted(year_trades, key=lambda value: value.executed_at, reverse=True):
         local_date = timezone.localtime(trade.executed_at)
-        key = f'{local_date.year}-{local_date.month:02d}'
+        key = f'{year}-{local_date.month:02d}'
         if key in seen_months:
             continue
         seen_months.add(key)
         available_months.append(
             {
                 'value': key,
-                'label': format_month_label(local_date.year, local_date.month, language),
+                'label': format_month_label(year, local_date.month, language),
             }
         )
 
@@ -721,6 +757,14 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
                 'label': format_month_label(year, month, language),
             }
         )
+
+    available_year_options = [
+        {
+            'value': str(available_year),
+            'label': str(available_year),
+        }
+        for available_year in available_years
+    ]
 
     monthly_pnls = [float(trade.net_pnl) for trade in filtered_trades]
     winners = [value for value in monthly_pnls if value > 0]
@@ -865,6 +909,8 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
 
     return {
         'summary': {
+            'selected_year': str(year),
+            'selected_year_label': str(year),
             'selected_month': current_month_value,
             'selected_month_label': format_month_label(year, month, language),
             'has_data': bool(filtered_trades),
@@ -877,6 +923,7 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
             'best_setup': max(setup_performance, key=setup_performance.get) if setup_performance else '--',
             'score': overall_score,
         },
+        'available_years': available_year_options,
         'available_months': available_months,
         'metrics': metric_cards,
         'scorecard': {

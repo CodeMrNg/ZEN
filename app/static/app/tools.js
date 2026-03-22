@@ -45,14 +45,18 @@
         return Number.isFinite(parsed) ? parsed : fallback;
     }
 
+    function trimTrailingZeroDecimals(value) {
+        return String(value ?? "").replace(/([.,])00(?=(?:\s*[^\d\s]+)?\s*$)/, "");
+    }
+
     function formatNumber(value, digits = 2) {
         if (!Number.isFinite(value)) {
             return "--";
         }
-        return new Intl.NumberFormat(locale, {
+        return trimTrailingZeroDecimals(new Intl.NumberFormat(locale, {
             minimumFractionDigits: digits,
             maximumFractionDigits: digits,
-        }).format(value);
+        }).format(value));
     }
 
     function formatSignedNumber(value, digits = 2) {
@@ -66,12 +70,12 @@
         if (!Number.isFinite(value)) {
             return "--";
         }
-        return new Intl.NumberFormat(locale, {
+        return trimTrailingZeroDecimals(new Intl.NumberFormat(locale, {
             style: "currency",
             currency: currencyCode,
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-        }).format(value);
+        }).format(value));
     }
 
     function formatSignedCurrency(value) {

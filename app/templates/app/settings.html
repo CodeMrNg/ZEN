@@ -140,7 +140,7 @@
                                     </div>
                                     <span>{{ account.broker|default:'Broker non renseigne' }}</span>
                                     <div class="account-card-stats">
-                                        <span class="detail-meta-pill">{{ account.currency_symbol }}{{ account.capital_base|floatformat:2 }}</span>
+                                        <span class="detail-meta-pill">{{ account.currency_symbol }}{{ account.capital_base|compact_number_grouped }}</span>
                                         {% if account.account_identifier %}
                                             <span class="detail-meta-pill">{{ account.account_identifier }}</span>
                                         {% endif %}
@@ -157,7 +157,7 @@
                                         data-account-name="{{ account.name }}"
                                         data-account-broker="{{ account.broker }}"
                                         data-account-identifier="{{ account.account_identifier }}"
-                                        data-account-capital="{{ account.capital_base }}"
+                                        data-account-capital="{{ account.capital_base|compact_number }}"
                                         data-account-currency="{{ account.currency }}"
                                         data-account-active="{% if active_account and account.id == active_account.id %}true{% else %}false{% endif %}"
                                     >
@@ -352,11 +352,11 @@
                     </article>
                     <article class="detail-card">
                         <span>{% tr 'settings.section.default_lots' 'Lots par defaut' %}</span>
-                        <strong>{{ preferences.default_lot_size|floatformat:2 }}</strong>
+                        <strong>{{ preferences.default_lot_size|compact_number }}</strong>
                     </article>
                     <article class="detail-card">
                         <span>{% tr 'settings.section.default_gp' 'G/P par defaut' %}</span>
-                        <strong>{{ preferences.default_fees|floatformat:2 }}</strong>
+                        <strong>{{ preferences.default_fees|compact_number }}</strong>
                     </article>
                     <article class="detail-card">
                         <span>{% tr 'settings.section.default_confidence' 'Confiance par defaut' %}</span>
@@ -705,7 +705,7 @@
                                     </div>
                                     <span>{{ account.broker|default:'Broker non renseigne' }}</span>
                                     <div class="account-card-stats">
-                                        <span class="detail-meta-pill">{{ account.currency_symbol }}{{ account.capital_base|floatformat:2 }}</span>
+                                        <span class="detail-meta-pill">{{ account.currency_symbol }}{{ account.capital_base|compact_number_grouped }}</span>
                                         {% if account.account_identifier %}
                                             <span class="detail-meta-pill">{{ account.account_identifier }}</span>
                                         {% endif %}

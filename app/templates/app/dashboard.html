@@ -19,11 +19,11 @@
     data-default-symbol="{{ trade_preferences.default_symbol }}"
     data-default-direction="{{ trade_preferences.default_direction }}"
     data-default-setup="{{ trade_preferences.default_setup }}"
-    data-default-lot-size="{{ trade_preferences.default_lot_size }}"
-    data-default-gp-value="{{ trade_preferences.default_fees }}"
+    data-default-lot-size="{{ trade_preferences.default_lot_size|compact_number }}"
+    data-default-gp-value="{{ trade_preferences.default_fees|compact_number }}"
     data-default-confidence="{{ trade_preferences.default_confidence }}"
-    data-capital-base="{{ trade_preferences.capital_base }}"
-    data-current-capital="{{ trade_current_capital|floatformat:2 }}"
+    data-capital-base="{{ trade_preferences.capital_base|compact_number }}"
+    data-current-capital="{{ trade_current_capital|compact_number }}"
     data-currency-code="{{ trade_preferences.currency }}"
 >
     <aside class="sidebar">
@@ -387,7 +387,7 @@
 
                     <div class="field-group">
                         <label for="rr_ratio">{% tr 'dashboard.trade_form.ratio' 'Ratio' %}</label>
-                        <input id="rr_ratio" name="rr_ratio" type="number" step="0.01" placeholder="2.50 ou -1.00" required>
+                        <input id="rr_ratio" name="rr_ratio" type="number" step="0.01" placeholder="2.50 ou -1" required>
                     </div>
 
                     <div class="field-group">
@@ -408,8 +408,8 @@
                             name="lot_size"
                             type="number"
                             step="0.01"
-                            value="{{ trade_preferences.default_lot_size }}"
-                            placeholder="1.00"
+                            value="{{ trade_preferences.default_lot_size|compact_number }}"
+                            placeholder="1"
                             required
                         >
                     </div>
@@ -421,22 +421,22 @@
                             name="gp_value"
                             type="number"
                             step="0.01"
-                            value="{{ trade_preferences.default_fees }}"
-                            placeholder="25.00"
+                            value="{{ trade_preferences.default_fees|compact_number }}"
+                            placeholder="25"
                         >
                     </div>
 
                     <div class="field-group">
                         <span class="field-static-label" id="capital-impact-label">{% tr 'dashboard.trade_form.capital_gain' 'Gain sur capital (%)' %}</span>
                         <div class="field-static-box">
-                            <strong class="field-static-value is-profit" id="capital-impact-percent">+0.00%</strong>
+                            <strong class="field-static-value is-profit" id="capital-impact-percent">+0%</strong>
                         </div>
                         <small class="field-help" id="trade-capital-hint">
-                            {% with capital_value=trade_current_capital|floatformat:2 %}
+                            {% with capital_value=trade_current_capital|compact_number_grouped %}
                                 {% tr 'dashboard.trade_form.capital_hint' 'Calcul base sur un capital actuel de {capital}.' capital=trade_preferences.currency_symbol|add:capital_value %}
                             {% endwith %}
                         </small>
-                        <small class="field-help">{% tr 'dashboard.trade_form.capital_help' 'TP = gain, SL = perte, BE = 0.00%.' %}</small>
+                        <small class="field-help">{% tr 'dashboard.trade_form.capital_help' 'TP = gain, SL = perte, BE = 0%.' %}</small>
                     </div>
 
                     <div class="field-group field-span-2">

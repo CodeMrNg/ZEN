@@ -8,8 +8,8 @@
 <div
     class="dashboard-shell"
     id="tools-app"
-    data-current-capital="{{ current_capital|floatformat:2 }}"
-    data-initial-capital="{{ active_account.capital_base|floatformat:2 }}"
+    data-current-capital="{{ current_capital|compact_number }}"
+    data-initial-capital="{{ active_account.capital_base|compact_number }}"
     data-currency-code="{{ active_account.currency }}"
 >
     <aside class="sidebar">
@@ -298,7 +298,7 @@
                 <div class="form-grid">
                     <div class="field-group">
                         <label for="compound-capital">Capital initial</label>
-                        <input id="compound-capital" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                        <input id="compound-capital" type="number" step="0.01" value="{{ current_capital|compact_number }}">
                     </div>
                     <div class="field-group">
                         <label for="compound-return">Rendement par periode (%)</label>
@@ -349,7 +349,7 @@
                 <div class="form-grid">
                     <div class="field-group">
                         <label for="position-capital">Capital</label>
-                        <input id="position-capital" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                        <input id="position-capital" type="number" step="0.01" value="{{ current_capital|compact_number }}">
                     </div>
                     <div class="field-group">
                         <label for="position-risk">Risque (%)</label>
@@ -501,7 +501,7 @@
                 <div class="form-grid">
                     <div class="field-group">
                         <label for="margin-capital">Capital</label>
-                        <input id="margin-capital" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                        <input id="margin-capital" type="number" step="0.01" value="{{ current_capital|compact_number }}">
                     </div>
                     <div class="field-group">
                         <label for="margin-price">Prix de l actif</label>
@@ -663,11 +663,11 @@
                 <div class="form-grid">
                     <div class="field-group">
                         <label for="drawdown-peak">Capital au sommet</label>
-                        <input id="drawdown-peak" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                        <input id="drawdown-peak" type="number" step="0.01" value="{{ current_capital|compact_number }}">
                     </div>
                     <div class="field-group">
                         <label for="drawdown-current">Capital actuel</label>
-                        <input id="drawdown-current" type="number" step="0.01" value="{{ current_capital|floatformat:2 }}">
+                        <input id="drawdown-current" type="number" step="0.01" value="{{ current_capital|compact_number }}">
                     </div>
                 </div>
                 <div class="tool-result-grid">

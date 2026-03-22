@@ -10,6 +10,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from .formatting import format_decimal_compact
 from .localization import normalize_language, translate
 from .models import (
     CURRENCY_SYMBOLS,
@@ -89,19 +90,19 @@ def format_currency(value, currency='USD'):
     amount = float(value)
     sign = '-' if amount < 0 else ''
     symbol = CURRENCY_SYMBOLS.get(currency, f'{currency} ')
-    return f'{sign}{symbol}{abs(amount):,.2f}'
+    return f'{sign}{symbol}{format_decimal_compact(abs(value), decimal_places=2, use_grouping=True)}'
 
 
 def format_signed_value(value):
     amount = float(value)
     sign = '+' if amount > 0 else ''
-    return f'{sign}{amount:,.2f}'
+    return f'{sign}{format_decimal_compact(value, decimal_places=2, use_grouping=True)}'
 
 
 def format_signed_percent(value):
     amount = float(value)
     sign = '+' if amount > 0 else ''
-    return f'{sign}{amount:,.2f}%'
+    return f'{sign}{format_decimal_compact(value, decimal_places=2, use_grouping=True)}%'
 
 
 def format_local_datetime(value):
@@ -435,13 +436,13 @@ def serialize_preferences(preferences, current_capital=None, account=None, langu
         'default_symbol': preferences.default_symbol,
         'default_direction': preferences.default_direction,
         'default_setup': preferences.default_setup,
-        'default_lot_size': f'{preferences.default_lot_size:.2f}',
-        'default_gp_value': f'{preferences.default_fees:.2f}',
-        'default_fees': f'{preferences.default_fees:.2f}',
+        'default_lot_size': format_decimal_compact(preferences.default_lot_size),
+        'default_gp_value': format_decimal_compact(preferences.default_fees),
+        'default_fees': format_decimal_compact(preferences.default_fees),
         'default_confidence': preferences.default_confidence,
-        'capital_base': f'{capital_base:.2f}',
+        'capital_base': format_decimal_compact(capital_base),
         'capital_base_formatted': format_currency(capital_base, currency),
-        'current_capital': f'{current_capital:.2f}',
+        'current_capital': format_decimal_compact(current_capital),
         'current_capital_formatted': format_currency(current_capital, currency),
         'currency': currency,
         'currency_symbol': currency_symbol,
@@ -582,20 +583,20 @@ def serialize_trade(trade, currency='USD', language=None):
         'entry_price': f'{trade.entry_price:,.4f}',
         'entry_price_value': f'{trade.entry_price:.4f}',
         'ratio': None if trade.rr_ratio is None else round(float(trade.rr_ratio), 2),
-        'ratio_value': None if trade.rr_ratio is None else f'{abs(trade.rr_ratio):.2f}',
-        'ratio_label': '--' if trade.rr_ratio is None else f'R {trade.rr_ratio:,.2f}',
+        'ratio_value': None if trade.rr_ratio is None else format_decimal_compact(abs(trade.rr_ratio)),
+        'ratio_label': '--' if trade.rr_ratio is None else f'R {format_decimal_compact(trade.rr_ratio, use_grouping=True)}',
         'gp_value': None if trade.gp_value is None else round(float(trade.gp_value), 2),
-        'gp_value_value': None if trade.gp_value is None else f'{abs(trade.gp_value):.2f}',
+        'gp_value_value': None if trade.gp_value is None else format_decimal_compact(abs(trade.gp_value)),
         'gp_value_label': '--' if trade.gp_value is None else format_signed_value(trade.gp_value),
         'lot_size': float(trade.lot_size or trade.quantity),
-        'lot_size_value': f'{(trade.lot_size or trade.quantity):.2f}',
-        'lot_size_label': f'{(trade.lot_size or trade.quantity):,.2f} lot(s)',
+        'lot_size_value': format_decimal_compact(trade.lot_size or trade.quantity),
+        'lot_size_label': f'{format_decimal_compact(trade.lot_size or trade.quantity, use_grouping=True)} lot(s)',
         'risk_percent': None if trade.risk_percent is None else round(float(trade.risk_percent), 2),
-        'risk_percent_label': '--' if trade.risk_percent is None else f'{trade.risk_percent:,.2f}%',
+        'risk_percent_label': '--' if trade.risk_percent is None else f'{format_decimal_compact(trade.risk_percent, use_grouping=True)}%',
         'capital_change_percent': None if capital_change_percent is None else round(float(capital_change_percent), 2),
         'capital_change_percent_label': '--' if capital_change_percent is None else format_signed_percent(capital_change_percent),
         'risk_amount_formatted': '--' if trade.risk_amount is None else format_currency(trade.risk_amount, currency),
-        'capital_base_value': f'{trade.capital_base:.2f}',
+        'capital_base_value': format_decimal_compact(trade.capital_base),
         'capital_base_formatted': format_currency(trade.capital_base, currency),
         'fees_formatted': format_currency(trade.fees, currency),
         'pnl': float(trade.net_pnl),

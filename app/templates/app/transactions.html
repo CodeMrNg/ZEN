@@ -36,9 +36,9 @@
 
         <article class="sidebar-card">
             <span>{% tr 'transactions.sidebar.current_capital' 'Capital actuel' %}</span>
-            <strong id="transactions-current-capital">{{ trade_preferences.currency_symbol }}{{ trade_preferences.capital_base|floatformat:2 }}</strong>
+            <strong id="transactions-current-capital">{{ trade_preferences.currency_symbol }}{{ trade_preferences.capital_base|compact_number_grouped }}</strong>
             <p id="transactions-capital-copy">
-                {% with capital_number=trade_preferences.capital_base|floatformat:2 %}
+                {% with capital_number=trade_preferences.capital_base|compact_number_grouped %}
                 {% with capital_value=trade_preferences.currency_symbol|add:capital_number %}
                     {% tr 'transactions.sidebar.pending_sync' 'Base {capital} | Synchronisation en attente.' capital=capital_value %}
                 {% endwith %}
@@ -222,7 +222,7 @@
 
                     <div class="field-group">
                         <label for="movement-amount" id="movement-amount-label">{% tr 'transactions.form.amount_withdrawal' 'Montant du retrait' %}</label>
-                        <input id="movement-amount" name="amount" type="number" step="0.01" min="0.01" placeholder="500.00" required>
+                        <input id="movement-amount" name="amount" type="number" step="0.01" min="0.01" placeholder="500" required>
                     </div>
 
                     <div class="field-group field-span-2">

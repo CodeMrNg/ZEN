@@ -28,7 +28,7 @@
                             <strong>{{ account.name }}</strong>
                             <span>{% if account.broker %}{{ account.broker }}{% else %}{% tr 'common.broker_missing' 'Broker non renseigne' %}{% endif %}</span>
                             <small>
-                                {{ account.currency_symbol }}{{ account.capital_base|floatformat:2 }}
+                                {{ account.currency_symbol }}{{ account.capital_base|compact_number_grouped }}
                                 {% if account.account_identifier %} | {{ account.account_identifier }}{% endif %}
                             </small>
                         </div>

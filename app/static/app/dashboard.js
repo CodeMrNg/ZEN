@@ -435,22 +435,34 @@ if (appNode) {
             .replace(/'/g, "&#39;");
     }
 
+    function trimTrailingZeroDecimals(value) {
+        return String(value ?? "").replace(/([.,])00(?=(?:\s*[^\d\s]+)?\s*$)/, "");
+    }
+
     function formatCurrency(value, currency = "USD") {
         const amount = Number.parseFloat(value || 0);
         if (Number.isNaN(amount)) {
-            return new Intl.NumberFormat(uiLocale, {
+            return trimTrailingZeroDecimals(new Intl.NumberFormat(uiLocale, {
                 style: "currency",
                 currency,
-            }).format(0);
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(0));
         }
-        return new Intl.NumberFormat(uiLocale, {
+        return trimTrailingZeroDecimals(new Intl.NumberFormat(uiLocale, {
             style: "currency",
             currency,
-        }).format(amount);
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount));
+    }
+
+    function formatCompactNumber(value, digits = 2) {
+        return trimTrailingZeroDecimals(Number(value).toFixed(digits));
     }
 
     function buildInitialPreferences() {
-        const capitalBase = appNode.dataset.capitalBase || "10000.00";
+        const capitalBase = appNode.dataset.capitalBase || "10000";
         const currentCapital = appNode.dataset.currentCapital || capitalBase;
         const currency = appNode.dataset.currencyCode || "USD";
         return {
@@ -458,8 +470,8 @@ if (appNode) {
             default_direction: appNode.dataset.defaultDirection || "LONG",
             default_result: "TAKE_PROFIT",
             default_setup: appNode.dataset.defaultSetup || "",
-            default_lot_size: appNode.dataset.defaultLotSize || "1.00",
-            default_gp_value: appNode.dataset.defaultGpValue || "0.00",
+            default_lot_size: appNode.dataset.defaultLotSize || "1",
+            default_gp_value: appNode.dataset.defaultGpValue || "0",
             default_confidence: appNode.dataset.defaultConfidence || "3",
             currency,
             capital_base: capitalBase,
@@ -542,20 +554,20 @@ if (appNode) {
 
         if (signedGpValue < 0) {
             capitalImpactLabel.textContent = strings.lossCapital;
-            capitalImpactPercent.textContent = `-${capitalPercent.toFixed(2)}%`;
+            capitalImpactPercent.textContent = `-${formatCompactNumber(capitalPercent)}%`;
             capitalImpactPercent.className = "field-static-value is-loss";
             return;
         }
 
         if (signedGpValue > 0) {
             capitalImpactLabel.textContent = strings.gainCapital;
-            capitalImpactPercent.textContent = `+${capitalPercent.toFixed(2)}%`;
+            capitalImpactPercent.textContent = `+${formatCompactNumber(capitalPercent)}%`;
             capitalImpactPercent.className = "field-static-value is-profit";
             return;
         }
 
         capitalImpactLabel.textContent = strings.impactCapital;
-        capitalImpactPercent.textContent = "0.00%";
+        capitalImpactPercent.textContent = "0%";
         capitalImpactPercent.className = "field-static-value is-flat";
     }
 
@@ -578,10 +590,10 @@ if (appNode) {
             confidenceInput.value = String(preferences.default_confidence || "3");
         }
         if (lotSizeInput && (overwrite || !lotSizeInput.value)) {
-            lotSizeInput.value = preferences.default_lot_size || "1.00";
+            lotSizeInput.value = preferences.default_lot_size || "1";
         }
         if (gpValueInput && (overwrite || !gpValueInput.value)) {
-            gpValueInput.value = preferences.default_gp_value || "0.00";
+            gpValueInput.value = preferences.default_gp_value || "0";
         }
 
         updateTradeCapitalHint();
@@ -1587,7 +1599,7 @@ if (appNode) {
     }
 
     function trimCalendarAmount(value) {
-        return String(value ?? "").replace(/([.,])00(?=(?:\s*[^\d\s]+)?\s*$)/, "");
+        return trimTrailingZeroDecimals(value);
     }
 
     function buildCalendarMarkup(calendar) {

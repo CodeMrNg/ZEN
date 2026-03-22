@@ -176,7 +176,7 @@ class TradingJournalApiTests(TestCase):
         self.assertIn('trade_map', payload['calendar'])
         self.assertEqual(payload['preferences']['default_symbol'], 'XAUUSD')
         self.assertEqual(payload['preferences']['currency'], 'USD')
-        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,095.00')
+        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,095')
         self.assertEqual(len(payload['recent_trades']), 1)
         self.assertEqual(len(payload['monthly_trades']), 1)
 
@@ -351,8 +351,8 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(trade_payload['result_label'], 'Stoploss')
         self.assertEqual(trade_payload['entry_price_value'], '3020.5000')
         self.assertEqual(trade_payload['ratio_value'], '1.50')
-        self.assertEqual(trade_payload['gp_value_value'], '150.00')
-        self.assertEqual(trade_payload['lot_size_value'], '2.00')
+        self.assertEqual(trade_payload['gp_value_value'], '150')
+        self.assertEqual(trade_payload['lot_size_value'], '2')
 
     def test_dashboard_api_applies_break_even_gp_value_to_capital_metrics(self):
         account = self.get_active_account()
@@ -383,7 +383,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload['recent_trades'][0]['capital_change_percent_label'], '+0.80%')
-        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,080.00')
+        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,080')
 
     def test_trade_creation_api_creates_trade(self):
         TradingPreference.objects.update_or_create(
@@ -766,20 +766,20 @@ class TradingJournalApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload['summary']['current_capital_label'], '$10,345.00')
+        self.assertEqual(payload['summary']['current_capital_label'], '$10,345')
         self.assertEqual(payload['summary']['trade_count_month'], 1)
         self.assertEqual(payload['summary']['winners_month'], 1)
         self.assertEqual(payload['summary']['losers_month'], 0)
-        self.assertEqual(payload['highlights']['deposits_label'], '$500.00')
-        self.assertEqual(payload['highlights']['withdrawals_label'], '$200.00')
-        self.assertIn('$395.00', payload['highlights']['best_month_label'])
-        self.assertIn('-$50.00', payload['highlights']['worst_month_label'])
+        self.assertEqual(payload['highlights']['deposits_label'], '$500')
+        self.assertEqual(payload['highlights']['withdrawals_label'], '$200')
+        self.assertIn('$395', payload['highlights']['best_month_label'])
+        self.assertIn('-$50', payload['highlights']['worst_month_label'])
         self.assertEqual(len(payload['monthly_history']), 2)
         self.assertEqual(len(payload['all_movements']), 2)
         self.assertEqual(payload['all_movements'][0]['kind'], 'WITHDRAWAL')
         self.assertEqual(payload['all_movements'][1]['kind'], 'DEPOSIT')
-        self.assertEqual(payload['monthly_history'][0]['capital_start_label'], '$9,950.00')
-        self.assertEqual(payload['monthly_history'][1]['capital_start_label'], '$10,000.00')
+        self.assertEqual(payload['monthly_history'][0]['capital_start_label'], '$9,950')
+        self.assertEqual(payload['monthly_history'][1]['capital_start_label'], '$10,000')
         self.assertEqual(payload['monthly_history'][0]['trade_count'], 1)
         self.assertEqual(payload['monthly_history'][0]['winners'], 1)
         self.assertEqual(payload['monthly_history'][0]['losers'], 0)
@@ -802,7 +802,7 @@ class TradingJournalApiTests(TestCase):
         movement = CapitalMovement.objects.get()
         self.assertEqual(movement.kind, CapitalMovement.Kind.WITHDRAWAL)
         self.assertEqual(movement.amount, Decimal('150.00'))
-        self.assertEqual(response.json()['movement']['amount_label'], '-$150.00')
+        self.assertEqual(response.json()['movement']['amount_label'], '-$150')
 
     def test_trade_update_api_updates_trade(self):
         trade = self.create_trade()
@@ -923,8 +923,8 @@ class TradingJournalApiTests(TestCase):
         response = self.client.get(reverse('app:settings'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '$10,395.00')
-        self.assertContains(response, '$10,000.00')
+        self.assertContains(response, '$10,395')
+        self.assertContains(response, '$10,000')
         self.assertContains(response, '+3.95%')
         self.assertContains(response, 'Capital initial')
 
@@ -1151,7 +1151,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['overview']['all_time_trade_count'], 1)
         self.assertEqual(payload['overview']['best_setup'], 'Secondary account trade')
         self.assertEqual(payload['preferences']['active_account']['name'], 'Compte prop')
-        self.assertIn('5,300.00', payload['preferences']['current_capital_formatted'])
+        self.assertIn('5,300', payload['preferences']['current_capital_formatted'])
 
     def test_dashboard_renders_only_three_active_global_social_links(self):
         self.get_active_account()

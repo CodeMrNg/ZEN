@@ -4,6 +4,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm, UserCreationForm
 from django.contrib.auth.models import User
 
+from .formatting import format_decimal_compact
 from .localization import normalize_language, translate
 from .models import CapitalMovement, Trade, TradingAccount, TradingPreference
 
@@ -31,6 +32,26 @@ def apply_choice_labels(field, labels):
 def remove_autofocus_from_fields(form):
     for field in form.fields.values():
         field.widget.attrs.pop('autofocus', None)
+
+
+class CompactDecimalInput(forms.NumberInput):
+    def __init__(self, *args, decimal_places=2, **kwargs):
+        self.decimal_places = decimal_places
+        super().__init__(*args, **kwargs)
+
+    def format_value(self, value):
+        if value in (None, ""):
+            return None
+        return format_decimal_compact(value, decimal_places=self.decimal_places)
+
+
+def apply_compact_decimal_widgets(form):
+    for field in form.fields.values():
+        if isinstance(field, forms.DecimalField):
+            field.widget = CompactDecimalInput(
+                attrs=field.widget.attrs.copy(),
+                decimal_places=getattr(field, "decimal_places", 2) or 2,
+            )
 
 
 class MultipleImageInput(forms.ClearableFileInput):
@@ -254,6 +275,7 @@ class TradeCreateForm(forms.ModelForm):
         self.preferences = preferences
         self.capital_base_override = capital_base_override
         super().__init__(*args, **kwargs)
+        apply_compact_decimal_widgets(self)
         if preferences and not self.is_bound:
             self.fields['symbol'].initial = preferences.default_symbol
             self.fields['direction'].initial = preferences.default_direction
@@ -350,6 +372,7 @@ class TradingPreferenceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(*args, **kwargs)
+        apply_compact_decimal_widgets(self)
         remove_autofocus_from_fields(self)
         active_account = getattr(self.instance, 'active_account', None)
         if active_account and not self.is_bound:
@@ -418,6 +441,7 @@ class BaseTradingAccountForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(*args, **kwargs)
+        apply_compact_decimal_widgets(self)
         remove_autofocus_from_fields(self)
         self.fields['name'].label = tr(self.language, 'form.account.name', 'Nom du compte')
         self.fields['broker'].label = tr(self.language, 'form.account.broker', 'Broker')
@@ -612,11 +636,12 @@ class CapitalMovementForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.language = normalize_language(kwargs.pop('language', 'fr'))
         super().__init__(*args, **kwargs)
+        apply_compact_decimal_widgets(self)
         self.fields['amount'].widget.attrs.update(
             {
                 'step': '0.01',
                 'min': '0.01',
-                'placeholder': '500.00',
+                'placeholder': '500',
             }
         )
         self.fields['note'].widget.attrs.update(

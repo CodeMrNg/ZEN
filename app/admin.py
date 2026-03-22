@@ -2,15 +2,33 @@ from django.contrib import admin
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
-from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
+from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradeScreenshot, TradingAccount, TradingPreference
 
 
 admin.site.site_header = "ZEN TRADING Admin"
 admin.site.site_title = "ZEN TRADING"
 admin.site.index_title = "Administration"
 admin.site.empty_value_display = "--"
+
+
+class TradeScreenshotInline(admin.TabularInline):
+    model = TradeScreenshot
+    extra = 1
+    fields = ("sort_order", "image", "preview")
+    readonly_fields = ("preview",)
+
+    @admin.display(description="Apercu")
+    def preview(self, obj):
+        if obj is None or not obj.image:
+            return "--"
+        return format_html(
+            '<a href="{url}" target="_blank" rel="noopener noreferrer">'
+            '<img src="{url}" alt="Image trade" style="width: 96px; height: 72px; object-fit: cover; border-radius: 12px; border: 1px solid #2b3446;" />'
+            "</a>",
+            url=obj.image.url,
+        )
 
 
 @admin.register(Trade)
@@ -111,6 +129,7 @@ class TradeAdmin(admin.ModelAdmin):
             },
         ),
     )
+    inlines = (TradeScreenshotInline,)
 
     @admin.display(description="Resultat")
     def display_resolved_result(self, obj):
@@ -130,13 +149,28 @@ class TradeAdmin(admin.ModelAdmin):
 
     @admin.display(description="Capture")
     def screenshot_preview(self, obj):
-        if not obj.screenshot:
+        if obj is None:
             return "Aucune image"
-        return format_html(
-            '<a href="{url}" target="_blank" rel="noopener noreferrer">'
-            '<img src="{url}" alt="Capture trade" style="max-width: 240px; border-radius: 12px; border: 1px solid #2b3446;" />'
+        gallery_urls = obj.screenshot_gallery_urls
+        if not gallery_urls:
+            return "Aucune image"
+        items = format_html_join(
+            "",
+            '<a href="{}" target="_blank" rel="noopener noreferrer" style="display:block;">'
+            '<img src="{}" alt="Capture trade" style="width: 112px; height: 84px; object-fit: cover; border-radius: 12px; border: 1px solid #2b3446;" />'
             "</a>",
-            url=obj.screenshot.url,
+            ((url, url) for url in gallery_urls[:6]),
+        )
+        extra_badge = ""
+        if len(gallery_urls) > 6:
+            extra_badge = format_html(
+                '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:56px;height:84px;padding:0 12px;border-radius:12px;border:1px solid #2b3446;background:#111723;font-weight:800;">+{}</span>',
+                len(gallery_urls) - 6,
+            )
+        return format_html(
+            '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">{}{}</div>',
+            items,
+            extra_badge,
         )
 
 

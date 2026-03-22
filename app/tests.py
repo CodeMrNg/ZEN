@@ -2,14 +2,16 @@ import shutil
 import tempfile
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from .error_views import custom_page_not_found, custom_server_error
+from .localization import translate
 from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
 
 
@@ -30,6 +32,7 @@ class DashboardAccessTests(TestCase):
         self.assertIn(reverse('app:login'), response.url)
 
 
+@override_settings(APP_TRANSLATION_PROVIDER="builtin")
 class ErrorPageViewTests(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -60,6 +63,36 @@ class ErrorPageViewTests(SimpleTestCase):
         self.assertIn('lang="en"', content)
 
 
+class LocalizationProviderTests(SimpleTestCase):
+    @override_settings(APP_TRANSLATION_PROVIDER="google_free")
+    @patch("app.localization.translate_with_provider")
+    def test_translate_uses_external_provider_when_configured(self, mock_translate_with_provider):
+        mock_translate_with_provider.return_value = "Account updated: FTMO."
+
+        value = translate(
+            "views.success.account_updated",
+            language="en",
+            account="FTMO",
+        )
+
+        self.assertEqual(value, "Account updated: FTMO.")
+        mock_translate_with_provider.assert_called_once_with(
+            "Compte mis a jour : FTMO.",
+            target_language="en",
+            source_language="fr",
+        )
+
+    @override_settings(APP_TRANSLATION_PROVIDER="google_free")
+    @patch("app.localization.translate_with_provider")
+    def test_translate_falls_back_to_builtin_when_provider_returns_none(self, mock_translate_with_provider):
+        mock_translate_with_provider.return_value = None
+
+        value = translate("dashboard.header.title", language="en")
+
+        self.assertEqual(value, "Performance dashboard")
+
+
+@override_settings(APP_TRANSLATION_PROVIDER="builtin")
 class TradingJournalApiTests(TestCase):
     def setUp(self):
         self.media_root = tempfile.mkdtemp()
@@ -117,6 +150,18 @@ class TradingJournalApiTests(TestCase):
             capital_base=account.capital_base,
             confidence=4,
             notes='Trade test',
+        )
+
+    def make_test_image(self, name='trade.gif'):
+        return SimpleUploadedFile(
+            name,
+            (
+                b'GIF89a\x01\x00\x01\x00\x80\x00\x00'
+                b'\x00\x00\x00\xff\xff\xff!\xf9\x04'
+                b'\x01\x00\x00\x00\x00,\x00\x00\x00'
+                b'\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
+            ),
+            content_type='image/gif',
         )
 
     def test_dashboard_api_returns_metrics(self):
@@ -194,27 +239,30 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['recent_trades'][0]['setup'], 'Trade 7')
         self.assertEqual(payload['recent_trades'][-1]['setup'], 'Trade 3')
 
-    def test_language_selection_persists_cookie_and_user_preference(self):
+    def test_settings_preferences_update_user_language_and_cookie(self):
         response = self.client.post(
-            reverse('app:set-language'),
+            reverse('app:settings'),
             data={
-                'language': 'en',
-                'next': reverse('app:dashboard'),
+                'action': 'preferences',
+                'ui_language': 'en',
+                'default_symbol': 'eurusd',
+                'default_direction': 'SHORT',
+                'default_setup': 'Asia reversal',
+                'default_lot_size': '2.50',
+                'default_fees': '3.75',
+                'default_confidence': '4',
+                'capital_base': '25000.00',
+                'currency': 'EUR',
             },
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response['Location'], reverse('app:dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<html lang="en"', html=False)
         self.assertEqual(response.cookies['django_language'].value, 'en')
         self.assertEqual(int(response.cookies['django_language']['max-age']), 31536000)
 
         preferences = TradingPreference.objects.get(user=self.user)
         self.assertEqual(preferences.ui_language, 'en')
-
-        dashboard_response = self.client.get(reverse('app:dashboard'))
-        self.assertContains(dashboard_response, '<html lang="en"', html=False)
-        self.assertContains(dashboard_response, 'Performance dashboard')
-        self.assertNotContains(dashboard_response, 'Dashboard de performance')
 
     def test_authenticated_user_language_is_restored_without_cookie(self):
         TradingPreference.objects.update_or_create(
@@ -230,33 +278,28 @@ class TradingJournalApiTests(TestCase):
         self.assertContains(response, '<html lang="fr"', html=False)
         self.assertEqual(response.cookies['django_language'].value, 'fr')
 
-    def test_language_switcher_only_exposes_french_and_english(self):
-        response = self.client.get(reverse('app:dashboard'))
+    def test_language_is_only_configurable_in_settings_with_fr_and_en(self):
+        dashboard_response = self.client.get(reverse('app:dashboard'))
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertNotContains(dashboard_response, 'data-language-switcher', html=False)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="fr"', html=False)
-        self.assertContains(response, 'value="en"', html=False)
-        self.assertNotContains(response, 'value="es"', html=False)
-        self.assertNotContains(response, 'value="pt"', html=False)
-        self.assertNotContains(response, 'value="ar"', html=False)
-        self.assertNotContains(response, 'value="zh-hans"', html=False)
+        settings_response = self.client.get(reverse('app:settings'))
+        self.assertEqual(settings_response.status_code, 200)
+        self.assertContains(settings_response, 'name="ui_language"', html=False)
+        self.assertContains(settings_response, 'value="fr"', html=False)
+        self.assertContains(settings_response, 'value="en"', html=False)
+        self.assertNotContains(settings_response, 'value="es"', html=False)
+        self.assertNotContains(settings_response, 'value="pt"', html=False)
+        self.assertNotContains(settings_response, 'value="ar"', html=False)
+        self.assertNotContains(settings_response, 'value="zh-hans"', html=False)
 
-    def test_login_keeps_language_selected_before_authentication(self):
+    def test_login_uses_saved_user_language_instead_of_request_cookie(self):
         TradingPreference.objects.update_or_create(
             user=self.user,
-            defaults={'ui_language': 'fr'},
+            defaults={'ui_language': 'en'},
         )
         client = self.client_class()
-
-        language_response = client.post(
-            reverse('app:set-language'),
-            data={
-                'language': 'en',
-                'next': reverse('app:login'),
-            },
-        )
-        self.assertEqual(language_response.status_code, 302)
-        self.assertEqual(language_response.cookies['django_language'].value, 'en')
+        client.cookies['django_language'] = 'fr'
 
         login_response = client.post(
             reverse('app:login'),
@@ -268,6 +311,7 @@ class TradingJournalApiTests(TestCase):
 
         self.assertEqual(login_response.status_code, 302)
         self.assertEqual(login_response['Location'], reverse('app:dashboard'))
+        self.assertEqual(login_response.cookies['django_language'].value, 'en')
 
         preferences = TradingPreference.objects.get(user=self.user)
         self.assertEqual(preferences.ui_language, 'en')
@@ -317,16 +361,6 @@ class TradingJournalApiTests(TestCase):
                 'default_symbol': 'XAUUSD',
             },
         )
-        image_file = SimpleUploadedFile(
-            'trade.gif',
-            (
-                b'GIF89a\x01\x00\x01\x00\x80\x00\x00'
-                b'\x00\x00\x00\xff\xff\xff!\xf9\x04'
-                b'\x01\x00\x00\x00\x00,\x00\x00\x00'
-                b'\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
-            ),
-            content_type='image/gif',
-        )
         payload = {
             'executed_at': '2026-03-20T10:30',
             'symbol': 'xauusd',
@@ -339,13 +373,19 @@ class TradingJournalApiTests(TestCase):
             'gp_value': '625.00',
             'confidence': 5,
             'notes': 'Execution propre',
-            'screenshot': image_file,
+            'screenshots': [
+                self.make_test_image('trade-a.gif'),
+                self.make_test_image('trade-b.gif'),
+            ],
         }
 
         response = self.client.post(reverse('app:trade-create'), data=payload)
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['trade']['capital_change_percent_label'], '-2.50%')
+        self.assertEqual(response.json()['trade']['screenshot_count'], 2)
+        self.assertEqual(len(response.json()['trade']['screenshot_urls']), 2)
+        self.assertEqual(len(response.json()['trade']['screenshots']), 2)
         self.assertEqual(Trade.objects.count(), 1)
         trade = Trade.objects.get()
         self.assertEqual(trade.symbol, 'XAUUSD')
@@ -357,7 +397,21 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(trade.capital_base, Decimal('25000.00'))
         self.assertEqual(trade.risk_amount, Decimal('250.00'))
         self.assertEqual(trade.risk_percent, Decimal('1.00'))
-        self.assertTrue(bool(trade.screenshot))
+        self.assertEqual(trade.screenshots.count(), 2)
+
+    def test_dashboard_api_serializes_trade_gallery(self):
+        trade = self.create_trade()
+        trade.screenshots.create(image=self.make_test_image('gallery-a.gif'), sort_order=0)
+        trade.screenshots.create(image=self.make_test_image('gallery-b.gif'), sort_order=1)
+
+        response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(response.status_code, 200)
+        trade_payload = response.json()['recent_trades'][0]
+        self.assertEqual(trade_payload['screenshot_count'], 2)
+        self.assertEqual(len(trade_payload['screenshot_urls']), 2)
+        self.assertEqual(len(trade_payload['screenshots']), 2)
+        self.assertTrue(trade_payload['screenshot_url'])
 
     def test_trade_creation_api_uses_current_capital_as_reference(self):
         TradingPreference.objects.update_or_create(
@@ -654,11 +708,44 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(trade.capital_base, Decimal('10000.00'))
         self.assertEqual(trade.risk_amount, Decimal('100.00'))
 
+    def test_trade_update_api_can_remove_existing_screenshots(self):
+        trade = self.create_trade()
+        screenshot_a = trade.screenshots.create(image=self.make_test_image('edit-a.gif'), sort_order=0)
+        screenshot_b = trade.screenshots.create(image=self.make_test_image('edit-b.gif'), sort_order=1)
+
+        response = self.client.post(
+            reverse('app:trade-update', args=[trade.pk]),
+            data={
+                'executed_at': '2026-03-22T09:15',
+                'symbol': 'xauusd',
+                'direction': 'LONG',
+                'setup': 'Breakout',
+                'entry_price': '0.0001',
+                'rr_ratio': '2.50',
+                'result': 'TAKE_PROFIT',
+                'lot_size': '1.00',
+                'gp_value': '125.00',
+                'confidence': '4',
+                'notes': 'Trade avec galerie mise a jour',
+                'removed_screenshot_ids': [str(screenshot_a.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        trade.refresh_from_db()
+        remaining_screenshots = list(trade.screenshots.order_by('sort_order', 'pk'))
+        self.assertEqual(len(remaining_screenshots), 1)
+        self.assertEqual(remaining_screenshots[0].pk, screenshot_b.pk)
+        self.assertEqual(remaining_screenshots[0].sort_order, 0)
+        self.assertEqual(response.json()['trade']['screenshot_count'], 1)
+        self.assertEqual(response.json()['trade']['screenshots'][0]['id'], str(screenshot_b.pk))
+
     def test_settings_view_updates_preferences(self):
         response = self.client.post(
             reverse('app:settings'),
             data={
                 'action': 'preferences',
+                'ui_language': 'fr',
                 'default_symbol': 'eurusd',
                 'default_direction': 'SHORT',
                 'default_setup': 'Asia reversal',
@@ -675,6 +762,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(preferences.default_symbol, 'EURUSD')
         self.assertEqual(preferences.default_direction, Trade.Direction.SHORT)
         self.assertEqual(preferences.default_setup, 'Asia reversal')
+        self.assertEqual(preferences.ui_language, 'fr')
         self.assertEqual(preferences.capital_base, Decimal('25000.00'))
         self.assertEqual(preferences.currency, TradingPreference.Currency.EUR)
         self.assertContains(response, 'Configuration enregistree.')

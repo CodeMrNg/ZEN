@@ -205,12 +205,34 @@
                     <input type="hidden" name="action" value="preferences">
 
                     <div class="settings-section">
-                    <div class="settings-section-copy">
-                        <h3>{% tr 'settings.section.entry_profile' 'Profil de saisie' %}</h3>
-                        <p>
-                            {% tr 'settings.section.entry_profile_copy' 'Ces parametres alimentent automatiquement le formulaire Nouveau trade afin de standardiser la saisie.' %}
-                        </p>
+                        <div class="settings-section-copy">
+                            <h3>{% tr 'language.title' "Langue de l'application" %}</h3>
+                            <p>
+                                {% tr 'settings.section.language_copy' 'La langue se configure uniquement ici et reste propre a votre compte utilisateur.' %}
+                            </p>
+                        </div>
+
+                        <div class="form-grid settings-capital-grid">
+                            <div class="field-group">
+                                <label for="{{ preferences_form.ui_language.id_for_label }}">{{ preferences_form.ui_language.label }}</label>
+                                {{ preferences_form.ui_language }}
+                                <small class="field-help">
+                                    {% tr 'settings.section.language_hint' 'Le changement est applique a votre session et memorise pour vos prochaines connexions.' %}
+                                </small>
+                                {% for error in preferences_form.ui_language.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
+
+                    <div class="settings-section">
+                        <div class="settings-section-copy">
+                            <h3>{% tr 'settings.section.entry_profile' 'Profil de saisie' %}</h3>
+                            <p>
+                                {% tr 'settings.section.entry_profile_copy' 'Ces parametres alimentent automatiquement le formulaire Nouveau trade afin de standardiser la saisie.' %}
+                            </p>
+                        </div>
 
                         <div class="form-grid">
                             <div class="field-group">

@@ -16,51 +16,6 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}" data-ui-locale="{{ app_language_locale }}">
-    <div class="language-switcher" data-language-switcher>
-        <button
-            type="button"
-            class="language-switcher-trigger"
-            data-language-switcher-trigger
-            aria-label="{% tr 'language.switch' 'Changer la langue' %}"
-            aria-expanded="false"
-            aria-controls="language-switcher-menu"
-        >
-            <span class="language-switcher-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="presentation">
-                    <path d="M12 3a9 9 0 1 0 9 9a9 9 0 0 0-9-9Zm6.55 8h-3.11a14.6 14.6 0 0 0-1.19-4.25A7.03 7.03 0 0 1 18.55 11ZM12 5.05c.78 1.05 1.78 3.18 2.23 5.95H9.77C10.22 8.23 11.22 6.1 12 5.05ZM5.45 11a7.03 7.03 0 0 1 4.3-4.25A14.6 14.6 0 0 0 8.56 11H5.45Zm0 2h3.11a14.6 14.6 0 0 0 1.19 4.25A7.03 7.03 0 0 1 5.45 13Zm6.55 5.95c-.78-1.05-1.78-3.18-2.23-5.95h4.46c-.45 2.77-1.45 4.9-2.23 5.95Zm2.25-1.7A14.6 14.6 0 0 0 15.44 13h3.11a7.03 7.03 0 0 1-4.3 4.25Z"></path>
-                </svg>
-            </span>
-            <span class="language-switcher-code">{{ app_language|upper }}</span>
-        </button>
-
-        <div class="language-switcher-menu" id="language-switcher-menu" hidden>
-            <div class="language-switcher-header">
-                <strong>{% tr 'language.title' "Langue de l'application" %}</strong>
-                <span>{% tr 'language.subtitle' "Selectionnez la langue d'affichage principale." %}</span>
-            </div>
-
-            <form action="{% url 'app:set-language' %}" method="post" class="language-switcher-form">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                {% for language in app_languages %}
-                    <button
-                        type="submit"
-                        name="language"
-                        value="{{ language.code }}"
-                        class="language-option{% if language.is_active %} is-active{% endif %}"
-                    >
-                        <span class="language-option-copy">
-                            <strong>{{ language.native_name }}</strong>
-                            <small>{{ language.english_name }}</small>
-                        </span>
-                        {% if language.is_active %}
-                            <span class="language-option-check">OK</span>
-                        {% endif %}
-                    </button>
-                {% endfor %}
-            </form>
-        </div>
-    </div>
     {% block content %}{% endblock %}
     <script src="{% static 'app/ui.js' %}" defer></script>
     {% block extra_scripts %}{% endblock %}

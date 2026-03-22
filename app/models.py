@@ -189,6 +189,42 @@ class Trade(models.Model):
             return '--'
         return self.Result(resolved).label
 
+    @property
+    def screenshot_gallery_urls(self):
+        urls = []
+        if self.screenshot:
+            urls.append(self.screenshot.url)
+        urls.extend(
+            screenshot.image.url
+            for screenshot in self.screenshots.all()
+            if screenshot.image
+        )
+        return urls
+
+    @property
+    def primary_screenshot_url(self):
+        gallery_urls = self.screenshot_gallery_urls
+        return gallery_urls[0] if gallery_urls else None
+
+
+class TradeScreenshot(models.Model):
+    trade = models.ForeignKey(
+        Trade,
+        on_delete=models.CASCADE,
+        related_name='screenshots',
+    )
+    image = models.ImageField(upload_to='trades/screenshots/')
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('sort_order', 'pk')
+        verbose_name = 'Image de trade'
+        verbose_name_plural = 'Images de trade'
+
+    def __str__(self):
+        return f'Image trade #{self.trade_id} ({self.sort_order})'
+
 
 class TradingPreference(models.Model):
     class Currency(models.TextChoices):

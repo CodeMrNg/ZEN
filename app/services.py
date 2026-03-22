@@ -16,6 +16,7 @@ from .models import (
     CapitalMovement,
     ServerRefreshStatus,
     Trade,
+    TradeScreenshot,
     TradingAccount,
     TradingPreference,
 )
@@ -454,10 +455,104 @@ def serialize_preferences(preferences, current_capital=None, account=None, langu
     }
 
 
+def attach_trade_screenshots(trade, uploaded_files):
+    if not trade.pk:
+        raise ValueError('Le trade doit etre sauvegarde avant l ajout des images.')
+
+    files = [uploaded_file for uploaded_file in (uploaded_files or []) if uploaded_file]
+    if not files:
+        return
+
+    current_max_sort_order = trade.screenshots.aggregate(max_sort_order=models.Max('sort_order'))['max_sort_order']
+    start_index = 0 if current_max_sort_order is None else current_max_sort_order + 1
+    for index, uploaded_file in enumerate(files, start=start_index):
+        TradeScreenshot.objects.create(
+            trade=trade,
+            image=uploaded_file,
+            sort_order=index,
+        )
+
+
+def serialize_trade_screenshots(trade):
+    screenshots = []
+    if trade.screenshot:
+        screenshots.append(
+            {
+                'id': 'legacy',
+                'url': trade.screenshot.url,
+                'name': trade.screenshot.name.replace('\\', '/').split('/')[-1],
+                'is_legacy': True,
+            }
+        )
+
+    screenshots.extend(
+        {
+            'id': str(screenshot.pk),
+            'url': screenshot.image.url,
+            'name': screenshot.image.name.replace('\\', '/').split('/')[-1],
+            'is_legacy': False,
+        }
+        for screenshot in trade.screenshots.all()
+        if screenshot.image
+    )
+    return screenshots
+
+
+def resequence_trade_screenshots(trade):
+    screenshots = list(trade.screenshots.order_by('sort_order', 'pk'))
+    for index, screenshot in enumerate(screenshots):
+        if screenshot.sort_order != index:
+            screenshot.sort_order = index
+
+    if screenshots:
+        TradeScreenshot.objects.bulk_update(screenshots, ['sort_order'])
+
+
+def remove_trade_screenshots(trade, removed_ids):
+    identifiers = [str(value).strip() for value in (removed_ids or []) if str(value).strip()]
+    if not identifiers:
+        return
+
+    if 'legacy' in identifiers and trade.screenshot:
+        trade.screenshot.delete(save=False)
+        trade.screenshot = None
+        trade.save(update_fields=['screenshot', 'updated_at'])
+
+    screenshot_ids = []
+    for identifier in identifiers:
+        try:
+            screenshot_ids.append(int(identifier))
+        except (TypeError, ValueError):
+            continue
+
+    screenshots = list(trade.screenshots.filter(pk__in=screenshot_ids))
+    for screenshot in screenshots:
+        screenshot.image.delete(save=False)
+
+    if screenshots:
+        TradeScreenshot.objects.filter(pk__in=[screenshot.pk for screenshot in screenshots]).delete()
+        resequence_trade_screenshots(trade)
+
+
+def get_removed_screenshot_ids(payload):
+    if hasattr(payload, 'getlist'):
+        return payload.getlist('removed_screenshot_ids')
+    if hasattr(payload, 'get'):
+        value = payload.get('removed_screenshot_ids')
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            return list(value)
+        return [value]
+    return []
+
+
 def serialize_trade(trade, currency='USD', language=None):
     executed_at = timezone.localtime(trade.executed_at)
     risk_reward = trade.risk_reward
-    screenshot_url = trade.screenshot.url if trade.screenshot else None
+    screenshots = serialize_trade_screenshots(trade)
+    screenshot_urls = [item['url'] for item in screenshots]
+    screenshot_url = screenshot_urls[0] if screenshot_urls else None
     capital_change_percent = (
         (trade.net_pnl / trade.capital_base * Decimal('100'))
         if trade.capital_base
@@ -503,8 +598,11 @@ def serialize_trade(trade, currency='USD', language=None):
         'confidence': trade.confidence,
         'confidence_label': f'{trade.confidence}/5',
         'notes': trade.notes,
+        'screenshots': screenshots,
         'screenshot_url': screenshot_url,
-}
+        'screenshot_urls': screenshot_urls,
+        'screenshot_count': len(screenshot_urls),
+    }
 
 
 def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_day, currency='USD', language=None):
@@ -565,6 +663,7 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, language=None):
             active_account,
         )
         .select_related('user')
+        .prefetch_related('screenshots')
         .order_by('executed_at', 'created_at')
     )
     movements = list(
@@ -827,14 +926,17 @@ def create_trade_for_user(user_id, payload, files, form_class, language=None):
         files,
         preferences=preferences,
         capital_base_override=current_capital,
+        language=language,
     )
     if not form.is_valid():
         return {'ok': False, 'errors': form.errors.get_json_data()}
 
-    trade = form.save(commit=False)
-    trade.user = user
-    trade.account = active_account
-    trade.save()
+    with transaction.atomic():
+        trade = form.save(commit=False)
+        trade.user = user
+        trade.account = active_account
+        trade.save()
+        attach_trade_screenshots(trade, form.cleaned_data.get('screenshots'))
     return {'ok': True, 'trade': serialize_trade(trade, active_account.currency, language=language)}
 
 
@@ -848,15 +950,18 @@ def update_trade_for_user(user_id, trade_id, payload, files, form_class, languag
     if not trade:
         return {'ok': False, 'message': tr('dashboard.modal.trade', language=language, default='Trade') + ' introuvable.'}
 
-    form = form_class(payload, files, instance=trade, preferences=preferences)
+    form = form_class(payload, files, instance=trade, preferences=preferences, language=language)
     if not form.is_valid():
         return {'ok': False, 'errors': form.errors.get_json_data()}
 
-    updated_trade = form.save(commit=False)
-    updated_trade.user_id = user_id
-    if updated_trade.account_id is None:
-        updated_trade.account = active_account
-    updated_trade.save()
+    with transaction.atomic():
+        updated_trade = form.save(commit=False)
+        updated_trade.user_id = user_id
+        if updated_trade.account_id is None:
+            updated_trade.account = active_account
+        updated_trade.save()
+        remove_trade_screenshots(updated_trade, get_removed_screenshot_ids(payload))
+        attach_trade_screenshots(updated_trade, form.cleaned_data.get('screenshots'))
     trade_currency = updated_trade.account.currency if updated_trade.account else active_account.currency
     return {'ok': True, 'trade': serialize_trade(updated_trade, trade_currency, language=language)}
 
@@ -894,6 +999,7 @@ def build_transactions_payload_for_user(user_id, language=None):
             active_account,
         )
         .select_related('user')
+        .prefetch_related('screenshots')
         .order_by('executed_at', 'created_at')
     )
     movements = list(

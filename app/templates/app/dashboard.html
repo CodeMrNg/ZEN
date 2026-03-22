@@ -438,15 +438,17 @@
                     </div>
 
                     <div class="field-group field-span-2">
-                        <label for="screenshot">{% tr 'dashboard.trade_form.image' 'Image du trade' %}</label>
-                        <input id="screenshot" name="screenshot" type="file" accept="image/*">
-                        <small class="field-help">{% tr 'dashboard.trade_form.image_help' 'Image compressee automatiquement avant televersement.' %}</small>
+                        <label for="screenshots">{% tr 'dashboard.trade_form.image' 'Images du trade' %}</label>
+                        <input id="screenshots" name="screenshots" type="file" accept="image/*" multiple>
+                        <small class="field-help">{% tr 'dashboard.trade_form.image_help' 'Vous pouvez ajouter plusieurs images. Chaque image est compressee automatiquement avant televersement.' %}</small>
                         <div class="image-preview" id="image-preview" hidden>
-                            <img id="image-preview-tag" alt="Apercu du trade">
-                            <div class="image-preview-meta">
-                                <strong id="image-preview-name">{% tr 'dashboard.trade_form.preview_empty' 'Aucun fichier selectionne' %}</strong>
-                                <span id="image-preview-size">--</span>
+                            <div class="image-preview-header">
+                                <div class="image-preview-meta">
+                                    <strong id="image-preview-name">{% tr 'dashboard.trade_form.preview_empty' 'Aucune image selectionnee' %}</strong>
+                                    <span id="image-preview-size">--</span>
+                                </div>
                             </div>
+                            <div class="image-preview-grid" id="image-preview-grid"></div>
                         </div>
                     </div>
 
@@ -526,6 +528,59 @@
 
             <div class="dashboard-modal-body">
                 <div class="recent-trades recent-trades-modal" id="month-trades-list"></div>
+            </div>
+        </section>
+    </div>
+
+    <div class="dashboard-modal image-viewer-modal" id="image-viewer-modal" hidden aria-hidden="true">
+        <div class="dashboard-modal-backdrop" data-close-image-viewer></div>
+        <section class="dashboard-modal-dialog image-viewer-dialog" role="dialog" aria-modal="true" aria-labelledby="image-viewer-title">
+            <div class="dashboard-modal-header image-viewer-header">
+                <div class="image-viewer-copy">
+                    <div>
+                        <p class="panel-kicker">{% tr 'dashboard.modal.image' 'Image' %}</p>
+                        <h2 id="image-viewer-title">{% tr 'dashboard.modal.image_preview' 'Apercu image' %}</h2>
+                    </div>
+                    <div class="image-viewer-actions">
+                        <a
+                            href="#"
+                            class="ghost-button icon-button"
+                            id="image-viewer-download"
+                            download
+                            aria-label="{% tr 'dashboard.modal.download_image' 'Telecharger l image' %}"
+                            title="{% tr 'dashboard.modal.download_image' 'Telecharger l image' %}"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 4v10"></path>
+                                <path d="M8 11l4 4 4-4"></path>
+                                <path d="M5 19h14"></path>
+                            </svg>
+                        </a>
+                        <button
+                            type="button"
+                            class="ghost-button icon-button is-danger"
+                            id="image-viewer-remove"
+                            hidden
+                            aria-label="{% tr 'dashboard.modal.remove_image' 'Supprimer l image' %}"
+                            title="{% tr 'dashboard.modal.remove_image' 'Supprimer l image' %}"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M5 7h14"></path>
+                                <path d="M9 7V5h6v2"></path>
+                                <path d="M9 10v7"></path>
+                                <path d="M15 10v7"></path>
+                                <path d="M7 7l1 12h8l1-12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" id="close-image-viewer" aria-label="{% tr 'dashboard.modal.close_image' 'Fermer l apercu image' %}">X</button>
+            </div>
+
+            <div class="dashboard-modal-body image-viewer-body">
+                <div class="image-viewer-stage">
+                    <img id="image-viewer-image" class="image-viewer-image" alt="">
+                </div>
             </div>
         </section>
     </div>

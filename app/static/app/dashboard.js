@@ -43,8 +43,19 @@ if (appNode) {
         dayPerformance: "Performance du jour",
         executions: "Executions",
         dayExecutionsTitle: "Executions de la journee",
-        tradeImage: "Image du trade",
+        tradeImages: "Images du trade",
         screenshotAltPrefix: "Capture",
+        noImageSelected: "Aucune image selectionnee",
+        imageCurrentBadge: "Actuelle",
+        imageNewBadge: "Nouvelle",
+        imageKeepHint: "Conservees si aucune nouvelle image n est ajoutee",
+        viewImage: "Agrandir l image",
+        imagePreviewTitle: "Apercu de l image",
+        downloadImage: "Telecharger l image",
+        removeImage: "Supprimer l image",
+        closeImageViewer: "Fermer l apercu image",
+        imageTypeError: "Chaque fichier doit etre une image.",
+        imageCompressionFailed: "La compression des images a echoue.",
         dateTime: "Date et heure",
         setup: "Setup",
         result: "Resultat",
@@ -108,8 +119,19 @@ if (appNode) {
         dayPerformance: "Day performance",
         executions: "Executions",
         dayExecutionsTitle: "Day executions",
-        tradeImage: "Trade image",
+        tradeImages: "Trade images",
         screenshotAltPrefix: "Screenshot",
+        noImageSelected: "No image selected",
+        imageCurrentBadge: "Current",
+        imageNewBadge: "New",
+        imageKeepHint: "Kept if no new image is added",
+        viewImage: "View image",
+        imagePreviewTitle: "Image preview",
+        downloadImage: "Download image",
+        removeImage: "Remove image",
+        closeImageViewer: "Close image preview",
+        imageTypeError: "Each file must be an image.",
+        imageCompressionFailed: "Image compression failed.",
         dateTime: "Date and time",
         setup: "Setup",
         result: "Result",
@@ -166,8 +188,8 @@ if (appNode) {
         charts: {},
         controller: null,
         flashTimeout: null,
-        compressedScreenshotFile: null,
-        previewObjectUrl: null,
+        compressedScreenshotFiles: [],
+        previewObjectUrls: [],
         expandedPanelChart: null,
         lastPayload: null,
         tradeLookup: new Map(),
@@ -177,7 +199,9 @@ if (appNode) {
         editingTradeId: null,
         editingCapitalBase: null,
         editingCapitalBaseFormatted: null,
-        existingScreenshotUrl: null,
+        existingScreenshots: [],
+        removedScreenshotIds: new Set(),
+        imageViewerContext: null,
     };
 
     const endpoints = {
@@ -218,6 +242,12 @@ if (appNode) {
     const monthTradesModalSubtitle = document.getElementById("month-trades-modal-subtitle");
     const monthTradesList = document.getElementById("month-trades-list");
     const closeMonthTradesModalButton = document.getElementById("close-month-trades-modal");
+    const imageViewerModal = document.getElementById("image-viewer-modal");
+    const closeImageViewerButton = document.getElementById("close-image-viewer");
+    const imageViewerTitle = document.getElementById("image-viewer-title");
+    const imageViewerImage = document.getElementById("image-viewer-image");
+    const imageViewerDownload = document.getElementById("image-viewer-download");
+    const imageViewerRemoveButton = document.getElementById("image-viewer-remove");
     const tradeForm = document.getElementById("trade-form");
     const lastUpdate = document.getElementById("last-update");
     const symbolInput = document.getElementById("symbol");
@@ -231,11 +261,11 @@ if (appNode) {
     const capitalImpactLabel = document.getElementById("capital-impact-label");
     const capitalImpactPercent = document.getElementById("capital-impact-percent");
     const capitalHint = document.getElementById("trade-capital-hint");
-    const screenshotInput = document.getElementById("screenshot");
+    const screenshotInput = document.getElementById("screenshots");
     const imagePreview = document.getElementById("image-preview");
-    const imagePreviewTag = document.getElementById("image-preview-tag");
     const imagePreviewName = document.getElementById("image-preview-name");
     const imagePreviewSize = document.getElementById("image-preview-size");
+    const imagePreviewGrid = document.getElementById("image-preview-grid");
     const recentTradesContainer = document.getElementById("recent-trades");
     const calendarGrid = document.getElementById("calendar-grid");
     const expandButtons = document.querySelectorAll("[data-expand-panel]");
@@ -272,6 +302,7 @@ if (appNode) {
         closePanelModalButton.addEventListener("click", closePanelModal);
         closeDetailModalButton.addEventListener("click", closeDetailModal);
         closeMonthTradesModalButton.addEventListener("click", closeMonthTradesModal);
+        closeImageViewerButton.addEventListener("click", closeImageViewer);
         expandButtons.forEach((button) => {
             button.addEventListener("click", () => openPanelModal(button.dataset.expandPanel));
         });
@@ -280,11 +311,13 @@ if (appNode) {
         ratioInput.addEventListener("input", updateCapitalImpactPreview);
         gpValueInput.addEventListener("input", updateCapitalImpactPreview);
         screenshotInput.addEventListener("change", handleScreenshotChange);
+        imagePreviewGrid.addEventListener("click", handleImagePreviewGridClick);
         recentTradesContainer.addEventListener("click", handleTradeCardClick);
         monthTradesList.addEventListener("click", handleTradeCardClick);
         monthTradesList.addEventListener("click", handleTradeEditClick);
         calendarGrid.addEventListener("click", handleCalendarCellClick);
         expandedCalendarGrid.addEventListener("click", handleCalendarCellClick);
+        detailModalBody.addEventListener("click", handleImageViewerTriggerClick);
         detailModalBody.addEventListener("click", handleTradeCardClick);
         detailModalBody.addEventListener("click", handleTradeEditClick);
         tradeModal.addEventListener("click", (event) => {
@@ -307,17 +340,33 @@ if (appNode) {
                 closeMonthTradesModal();
             }
         });
+        imageViewerModal.addEventListener("click", (event) => {
+            if (event.target.matches("[data-close-image-viewer]")) {
+                closeImageViewer();
+            }
+        });
+        imageViewerRemoveButton.addEventListener("click", handleImageViewerRemove);
         document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape" && !tradeModal.hidden) {
+            if (event.key !== "Escape") {
+                return;
+            }
+            if (!imageViewerModal.hidden) {
+                closeImageViewer();
+                return;
+            }
+            if (!tradeModal.hidden) {
                 closeTradeModal();
+                return;
             }
-            if (event.key === "Escape" && !panelModal.hidden) {
+            if (!panelModal.hidden) {
                 closePanelModal();
+                return;
             }
-            if (event.key === "Escape" && !detailModal.hidden) {
+            if (!detailModal.hidden) {
                 closeDetailModal();
+                return;
             }
-            if (event.key === "Escape" && !monthTradesModal.hidden) {
+            if (!monthTradesModal.hidden) {
                 closeMonthTradesModal();
             }
         });
@@ -543,33 +592,214 @@ if (appNode) {
         return `${(size / (1024 * 1024)).toFixed(2)} Mo`;
     }
 
-    function resetImagePreview() {
-        state.compressedScreenshotFile = null;
-        state.existingScreenshotUrl = null;
-        if (state.previewObjectUrl) {
-            URL.revokeObjectURL(state.previewObjectUrl);
-            state.previewObjectUrl = null;
+    function formatImageCountLabel(count, context = "selected") {
+        if (langCode.startsWith("fr")) {
+            if (context === "existing") {
+                return count > 1 ? `${count} images actuellement associees` : "1 image actuellement associee";
+            }
+            if (context === "gallery") {
+                return count > 1 ? `${count} images dans la galerie` : "1 image dans la galerie";
+            }
+            if (context === "new") {
+                return count > 1 ? `${count} nouvelles images seront ajoutees` : "1 nouvelle image sera ajoutee";
+            }
+            return count > 1 ? `${count} images selectionnees` : "1 image selectionnee";
         }
-        imagePreview.hidden = true;
-        imagePreviewTag.removeAttribute("src");
-        imagePreviewName.textContent = "Aucun fichier selectionne";
-        imagePreviewSize.textContent = "--";
+
+        if (context === "existing") {
+            return count > 1 ? `${count} images currently attached` : "1 image currently attached";
+        }
+        if (context === "gallery") {
+            return count > 1 ? `${count} images in the gallery` : "1 image in the gallery";
+        }
+        if (context === "new") {
+            return count > 1 ? `${count} new images will be added` : "1 new image will be added";
+        }
+        return count > 1 ? `${count} images selected` : "1 image selected";
     }
 
-    function showExistingImagePreview(url) {
-        resetImagePreview();
-        if (!url) {
+    function formatTradeImageCount(count) {
+        if (langCode.startsWith("fr")) {
+            return `${count} image${count === 1 ? "" : "s"}`;
+        }
+        return `${count} image${count === 1 ? "" : "s"}`;
+    }
+
+    function revokePreviewUrls() {
+        state.previewObjectUrls.forEach((url) => {
+            URL.revokeObjectURL(url);
+        });
+        state.previewObjectUrls = [];
+    }
+
+    function removePreviewUrlAt(index) {
+        const [previewUrl] = state.previewObjectUrls.splice(index, 1);
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+    }
+
+    function renderActionIcon(kind) {
+        if (kind === "download") {
+            return `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 4v10"></path>
+                    <path d="M8 11l4 4 4-4"></path>
+                    <path d="M5 19h14"></path>
+                </svg>
+            `;
+        }
+
+        return `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7h14"></path>
+                <path d="M9 7V5h6v2"></path>
+                <path d="M9 10v7"></path>
+                <path d="M15 10v7"></path>
+                <path d="M7 7l1 12h8l1-12"></path>
+            </svg>
+        `;
+    }
+
+    function buildImageViewerAttributes(item) {
+        const attributes = [
+            'data-open-image-viewer',
+            `data-image-src="${escapeHtml(item.src)}"`,
+            `data-image-name="${escapeHtml(item.name || "")}"`,
+            `data-image-alt="${escapeHtml(item.alt)}"`,
+        ];
+
+        if (item.deletable) {
+            attributes.push('data-image-can-remove="true"');
+            attributes.push(`data-image-kind="${escapeHtml(item.kind || "")}"`);
+            attributes.push(`data-image-id="${escapeHtml(item.id || "")}"`);
+        }
+
+        return attributes.join(" ");
+    }
+
+    function renderImagePreviewGrid(items) {
+        imagePreviewGrid.innerHTML = items.map((item, index) => {
+            const primaryClass = index === 0 && items.length > 1 ? " is-primary" : "";
+            const badge = item.badge ? `<span class="image-preview-badge">${escapeHtml(item.badge)}</span>` : "";
+            return `
+                <figure class="image-preview-tile${primaryClass}">
+                    <button
+                        type="button"
+                        class="image-preview-open"
+                        ${buildImageViewerAttributes(item)}
+                        aria-label="${strings.viewImage}"
+                        title="${strings.viewImage}"
+                    >
+                        <img src="${item.src}" alt="${escapeHtml(item.alt)}">
+                    </button>
+                    ${badge}
+                    <div class="image-tile-actions">
+                        <a
+                            class="image-tile-action"
+                            href="${escapeHtml(item.src)}"
+                            download="${escapeHtml(item.name || `trade-image-${index + 1}.jpg`)}"
+                            aria-label="${strings.downloadImage}"
+                            title="${strings.downloadImage}"
+                            data-download-image
+                        >
+                            ${renderActionIcon("download")}
+                        </a>
+                        ${item.deletable ? `
+                            <button
+                                type="button"
+                                class="image-tile-action is-danger"
+                                data-remove-preview-image="${escapeHtml(item.kind || "")}"
+                                data-image-id="${escapeHtml(item.id || "")}"
+                                aria-label="${strings.removeImage}"
+                                title="${strings.removeImage}"
+                            >
+                                ${renderActionIcon("remove")}
+                            </button>
+                        ` : ""}
+                    </div>
+                </figure>
+            `;
+        }).join("");
+    }
+
+    function rebuildImagePreview() {
+        const existingScreenshots = state.existingScreenshots || [];
+        const previewUrls = state.previewObjectUrls || [];
+        const previewFiles = state.compressedScreenshotFiles || [];
+        const items = [
+            ...existingScreenshots.map((screenshot, index) => ({
+                kind: "existing",
+                id: String(screenshot.id ?? `fallback-${index}`),
+                src: screenshot.url,
+                alt: `${strings.screenshotAltPrefix} ${index + 1}`,
+                name: screenshot.name || `trade-image-${index + 1}.jpg`,
+                badge: strings.imageCurrentBadge,
+                deletable: true,
+            })),
+            ...previewUrls.map((url, index) => ({
+                kind: "new",
+                id: String(index),
+                src: url,
+                alt: `${strings.screenshotAltPrefix} ${existingScreenshots.length + index + 1}`,
+                name: previewFiles[index]?.name || `trade-image-${existingScreenshots.length + index + 1}.jpg`,
+                badge: strings.imageNewBadge,
+                deletable: true,
+            })),
+        ];
+
+        if (!items.length) {
+            imagePreview.hidden = true;
+            imagePreviewGrid.innerHTML = "";
+            imagePreviewName.textContent = strings.noImageSelected;
+            imagePreviewSize.textContent = "--";
             return;
         }
-        state.existingScreenshotUrl = url;
-        imagePreviewTag.src = url;
-        imagePreviewName.textContent = "Fichier actuellement associe";
-        imagePreviewSize.textContent = "Conserve si aucun nouveau fichier n est selectionne";
+
+        renderImagePreviewGrid(items);
+
+        if (existingScreenshots.length && previewFiles.length) {
+            const originalTotal = previewFiles.reduce((sum, file) => sum + (file.originalSize || file.size), 0);
+            const compressedTotal = previewFiles.reduce((sum, file) => sum + file.size, 0);
+            imagePreviewName.textContent = formatImageCountLabel(items.length, "gallery");
+            imagePreviewSize.textContent = `${formatImageCountLabel(previewFiles.length, "new")} | ${formatFileSize(originalTotal)} -> ${formatFileSize(compressedTotal)}`;
+        } else if (previewFiles.length) {
+            const originalTotal = previewFiles.reduce((sum, file) => sum + (file.originalSize || file.size), 0);
+            const compressedTotal = previewFiles.reduce((sum, file) => sum + file.size, 0);
+            imagePreviewName.textContent = formatImageCountLabel(previewFiles.length, "selected");
+            imagePreviewSize.textContent = `${formatFileSize(originalTotal)} -> ${formatFileSize(compressedTotal)}`;
+        } else {
+            imagePreviewName.textContent = formatImageCountLabel(existingScreenshots.length, "existing");
+            imagePreviewSize.textContent = strings.imageKeepHint;
+        }
+
         imagePreview.hidden = false;
     }
 
+    function resetImagePreview() {
+        state.compressedScreenshotFiles = [];
+        state.existingScreenshots = [];
+        state.removedScreenshotIds = new Set();
+        revokePreviewUrls();
+        rebuildImagePreview();
+    }
+
+    function showExistingImagePreview(screenshots) {
+        state.existingScreenshots = Array.isArray(screenshots)
+            ? screenshots.filter((item) => item && item.url).map((item, index) => ({
+                id: item.id ?? `fallback-${index}`,
+                url: item.url,
+                name: item.name || `trade-image-${index + 1}.jpg`,
+            }))
+            : [];
+        state.removedScreenshotIds = new Set();
+        revokePreviewUrls();
+        state.compressedScreenshotFiles = [];
+        rebuildImagePreview();
+    }
+
     function updateModalOpenState() {
-        const hasVisibleModal = !tradeModal.hidden || !panelModal.hidden || !detailModal.hidden || !monthTradesModal.hidden;
+        const hasVisibleModal = !tradeModal.hidden || !panelModal.hidden || !detailModal.hidden || !monthTradesModal.hidden || !imageViewerModal.hidden;
         document.body.classList.toggle("modal-open", hasVisibleModal);
     }
 
@@ -603,6 +833,91 @@ if (appNode) {
 
     function buildTradeUpdateUrl(tradeId) {
         return endpoints.tradeUpdateBase.replace("/0/update/", `/${tradeId}/update/`);
+    }
+
+    function getTradeScreenshots(trade) {
+        if (Array.isArray(trade?.screenshots) && trade.screenshots.length) {
+            return trade.screenshots.filter((item) => item && item.url).map((item, index) => ({
+                id: item.id ?? `fallback-${index}`,
+                url: item.url,
+                name: item.name || `trade-image-${index + 1}.jpg`,
+            }));
+        }
+        if (Array.isArray(trade?.screenshot_urls) && trade.screenshot_urls.length) {
+            return trade.screenshot_urls.filter(Boolean).map((url, index) => ({
+                id: `fallback-${index}`,
+                url,
+                name: `trade-image-${index + 1}.jpg`,
+            }));
+        }
+        return trade?.screenshot_url ? [{
+            id: "fallback-0",
+            url: trade.screenshot_url,
+            name: "trade-image-1.jpg",
+        }] : [];
+    }
+
+    function getTradeScreenshotUrls(trade) {
+        return getTradeScreenshots(trade).map((item) => item.url);
+    }
+
+    function getTradeScreenshotCount(trade) {
+        const explicitCount = Number.parseInt(trade?.screenshot_count, 10);
+        if (Number.isFinite(explicitCount)) {
+            return explicitCount;
+        }
+        return getTradeScreenshots(trade).length;
+    }
+
+    function renderTradeImageCountBadge(trade) {
+        return `<span class="trade-media-pill">${formatTradeImageCount(getTradeScreenshotCount(trade))}</span>`;
+    }
+
+    function renderTradeImageCover(trade, imageClass) {
+        const screenshots = getTradeScreenshots(trade);
+        if (!screenshots.length) {
+            return "";
+        }
+        const countBadge = screenshots.length > 1
+            ? `<span class="trade-image-count">+${screenshots.length - 1}</span>`
+            : "";
+        return `
+            <div class="trade-image-frame">
+                <img class="${imageClass}" src="${screenshots[0].url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">
+                ${countBadge}
+            </div>
+        `;
+    }
+
+    function renderTradeImageGallery(trade) {
+        const screenshots = getTradeScreenshots(trade);
+        if (!screenshots.length) {
+            return "";
+        }
+        return `
+            <section class="detail-section">
+                <h3>${strings.tradeImages}</h3>
+                <div class="detail-image-gallery">
+                    ${screenshots.map((screenshot, index) => {
+                        const primaryClass = index === 0 && screenshots.length > 1 ? " is-primary" : "";
+                        return `
+                            <button
+                                type="button"
+                                class="detail-image-tile${primaryClass}"
+                                data-open-image-viewer
+                                data-image-src="${escapeHtml(screenshot.url)}"
+                                data-image-name="${escapeHtml(screenshot.name || `trade-image-${index + 1}.jpg`)}"
+                                data-image-alt="${strings.screenshotAltPrefix} ${index + 1} ${escapeHtml(trade.symbol)}"
+                                aria-label="${strings.viewImage}"
+                                title="${strings.viewImage}"
+                            >
+                                <img class="detail-image" src="${screenshot.url}" alt="${strings.screenshotAltPrefix} ${index + 1} ${escapeHtml(trade.symbol)}">
+                            </button>
+                        `;
+                    }).join("")}
+                </div>
+            </section>
+        `;
     }
 
     function setTradeModalMode(mode = "create") {
@@ -643,7 +958,7 @@ if (appNode) {
         gpValueInput.value = trade.gp_value_value ?? (trade.gp_value == null ? "" : String(Math.abs(trade.gp_value)));
         document.getElementById("notes").value = trade.notes || "";
         screenshotInput.value = "";
-        showExistingImagePreview(trade.screenshot_url);
+        showExistingImagePreview(getTradeScreenshots(trade));
         updateTradeCapitalHint();
         updateCapitalImpactPreview();
     }
@@ -682,36 +997,157 @@ if (appNode) {
         closeModal(monthTradesModal);
     }
 
+    function closeImageViewer() {
+        state.imageViewerContext = null;
+        imageViewerImage.removeAttribute("src");
+        imageViewerImage.alt = "";
+        imageViewerDownload.removeAttribute("href");
+        imageViewerDownload.removeAttribute("download");
+        imageViewerTitle.textContent = strings.imagePreviewTitle;
+        imageViewerRemoveButton.hidden = true;
+        imageViewerRemoveButton.dataset.imageKind = "";
+        imageViewerRemoveButton.dataset.imageId = "";
+        closeModal(imageViewerModal);
+    }
+
     async function handleScreenshotChange(event) {
-        const file = event.target.files[0];
-        if (!file) {
-            resetImagePreview();
+        const files = Array.from(event.target.files || []);
+        if (!files.length) {
             return;
         }
 
-        if (!file.type.startsWith("image/")) {
-            resetImagePreview();
+        if (files.some((file) => !file.type.startsWith("image/"))) {
             screenshotInput.value = "";
-            showFlash("Le fichier doit etre une image.", "error");
+            showFlash(strings.imageTypeError, "error");
             return;
         }
 
         try {
-            const compressedFile = await compressImageFile(file);
-            state.compressedScreenshotFile = compressedFile;
-            if (state.previewObjectUrl) {
-                URL.revokeObjectURL(state.previewObjectUrl);
+            const compressedFiles = [];
+            for (const file of files) {
+                const compressedFile = await compressImageFile(file);
+                compressedFile.originalSize = file.size;
+                compressedFiles.push(compressedFile);
             }
-            state.previewObjectUrl = URL.createObjectURL(compressedFile);
-            imagePreviewTag.src = state.previewObjectUrl;
-            imagePreviewName.textContent = compressedFile.name;
-            imagePreviewSize.textContent = `${formatFileSize(file.size)} -> ${formatFileSize(compressedFile.size)}`;
-            imagePreview.hidden = false;
-        } catch (error) {
-            resetImagePreview();
+            state.compressedScreenshotFiles = [
+                ...state.compressedScreenshotFiles,
+                ...compressedFiles,
+            ];
+            state.previewObjectUrls = [
+                ...state.previewObjectUrls,
+                ...compressedFiles.map((file) => URL.createObjectURL(file)),
+            ];
             screenshotInput.value = "";
-            showFlash(error.message || "La compression de l image a echoue.", "error");
+            rebuildImagePreview();
+        } catch (error) {
+            screenshotInput.value = "";
+            showFlash(error.message || strings.imageCompressionFailed, "error");
         }
+    }
+
+    function openImageViewer({ src, name, alt, imageKind = "", imageId = "", allowRemove = false }) {
+        if (!src) {
+            return;
+        }
+
+        state.imageViewerContext = allowRemove
+            ? { imageKind, imageId }
+            : null;
+        imageViewerTitle.textContent = name || strings.imagePreviewTitle;
+        imageViewerImage.src = src;
+        imageViewerImage.alt = alt || name || strings.imagePreviewTitle;
+        imageViewerDownload.href = src;
+        imageViewerDownload.download = name || "trade-image.jpg";
+        imageViewerRemoveButton.hidden = !allowRemove;
+        imageViewerRemoveButton.dataset.imageKind = allowRemove ? imageKind : "";
+        imageViewerRemoveButton.dataset.imageId = allowRemove ? imageId : "";
+        openModal(imageViewerModal);
+    }
+
+    function openImageViewerFromTrigger(trigger) {
+        if (!trigger) {
+            return;
+        }
+
+        openImageViewer({
+            src: trigger.dataset.imageSrc,
+            name: trigger.dataset.imageName,
+            alt: trigger.dataset.imageAlt,
+            imageKind: trigger.dataset.imageKind,
+            imageId: trigger.dataset.imageId,
+            allowRemove: trigger.dataset.imageCanRemove === "true",
+        });
+    }
+
+    function removeExistingPreviewImage(imageId) {
+        if (!imageId) {
+            return;
+        }
+
+        state.existingScreenshots = state.existingScreenshots.filter(
+            (screenshot) => String(screenshot.id) !== String(imageId),
+        );
+        if (!String(imageId).startsWith("fallback-")) {
+            state.removedScreenshotIds.add(String(imageId));
+        }
+        rebuildImagePreview();
+    }
+
+    function removeNewPreviewImage(imageId) {
+        const previewIndex = Number.parseInt(imageId, 10);
+        if (!Number.isFinite(previewIndex) || previewIndex < 0) {
+            return;
+        }
+
+        state.compressedScreenshotFiles.splice(previewIndex, 1);
+        removePreviewUrlAt(previewIndex);
+        rebuildImagePreview();
+    }
+
+    function handleImagePreviewGridClick(event) {
+        if (event.target.closest("[data-download-image]")) {
+            return;
+        }
+
+        const removeTrigger = event.target.closest("[data-remove-preview-image]");
+        if (removeTrigger) {
+            event.preventDefault();
+            const imageKind = removeTrigger.dataset.removePreviewImage;
+            const imageId = removeTrigger.dataset.imageId;
+            if (imageKind === "existing") {
+                removeExistingPreviewImage(imageId);
+            } else if (imageKind === "new") {
+                removeNewPreviewImage(imageId);
+            }
+            return;
+        }
+
+        const viewerTrigger = event.target.closest("[data-open-image-viewer]");
+        if (viewerTrigger) {
+            event.preventDefault();
+            openImageViewerFromTrigger(viewerTrigger);
+        }
+    }
+
+    function handleImageViewerTriggerClick(event) {
+        const viewerTrigger = event.target.closest("[data-open-image-viewer]");
+        if (!viewerTrigger) {
+            return;
+        }
+
+        event.preventDefault();
+        openImageViewerFromTrigger(viewerTrigger);
+    }
+
+    function handleImageViewerRemove() {
+        const imageKind = imageViewerRemoveButton.dataset.imageKind;
+        const imageId = imageViewerRemoveButton.dataset.imageId;
+        if (imageKind === "existing") {
+            removeExistingPreviewImage(imageId);
+        } else if (imageKind === "new") {
+            removeNewPreviewImage(imageId);
+        }
+        closeImageViewer();
     }
 
     async function compressImageFile(file) {
@@ -861,20 +1297,22 @@ if (appNode) {
     function buildTradeCardMarkup(trade) {
         return `
             <button type="button" class="recent-trade recent-trade-button" data-trade-id="${trade.id}">
-                ${trade.screenshot_url ? `<img class="recent-trade-image" src="${trade.screenshot_url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">` : ""}
                 <div class="recent-trade-header">
                     <div class="recent-trade-title">
                         <strong>${escapeHtml(trade.symbol)} | ${escapeHtml(trade.direction)}</strong>
                         <span>${escapeHtml(trade.setup)}</span>
                     </div>
-                    <span class="pnl-pill ${trade.pnl_tone}">${escapeHtml(trade.pnl_formatted)}</span>
+                    ${renderTradeImageCountBadge(trade)}
                 </div>
                 <div class="recent-trade-meta">
                     <span>${escapeHtml(trade.executed_at_label)}</span>
-                    <span>${escapeHtml(trade.result_label)} | ${escapeHtml(trade.ratio_label)}</span>
+                    <span class="pnl-pill ${trade.pnl_tone}">${escapeHtml(trade.pnl_formatted)}</span>
                 </div>
                 <div class="recent-trade-meta">
+                    <span>${escapeHtml(trade.result_label)} | ${escapeHtml(trade.ratio_label)}</span>
                     <span>${escapeHtml(trade.gp_value_label)} | ${escapeHtml(trade.capital_change_percent_label)}</span>
+                </div>
+                <div class="recent-trade-meta">
                     <span>${escapeHtml(trade.market)}</span>
                 </div>
             </button>
@@ -1361,7 +1799,7 @@ if (appNode) {
                     ${trades.map((trade) => {
                         return `
                             <button type="button" class="day-trade-item" data-trade-id="${trade.id}">
-                                ${trade.screenshot_url ? `<img class="day-trade-thumb" src="${trade.screenshot_url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">` : ""}
+                                ${renderTradeImageCover(trade, "day-trade-thumb")}
                                 <div class="day-trade-main">
                                     <div class="day-trade-topline">
                                         <strong>${escapeHtml(trade.symbol)}</strong>
@@ -1404,12 +1842,7 @@ if (appNode) {
                 </div>
                 <span class="pnl-pill ${trade.pnl_tone}">${escapeHtml(trade.pnl_formatted)}</span>
             </div>
-            ${trade.screenshot_url ? `
-                <section class="detail-section">
-                    <h3>${strings.tradeImage}</h3>
-                    <img class="detail-image" src="${trade.screenshot_url}" alt="${strings.screenshotAltPrefix} ${escapeHtml(trade.symbol)}">
-                </section>
-            ` : ""}
+            ${renderTradeImageGallery(trade)}
             <div class="detail-grid">
                 <article class="detail-card">
                     <span>${strings.dateTime}</span>
@@ -1486,10 +1919,14 @@ if (appNode) {
     async function handleTradeSubmit(event) {
         event.preventDefault();
         const formData = new FormData(tradeForm);
-        if (state.compressedScreenshotFile) {
-            formData.delete("screenshot");
-            formData.append("screenshot", state.compressedScreenshotFile, state.compressedScreenshotFile.name);
-        }
+        formData.delete("screenshots");
+        formData.delete("removed_screenshot_ids");
+        state.compressedScreenshotFiles.forEach((file) => {
+            formData.append("screenshots", file, file.name);
+        });
+        state.removedScreenshotIds.forEach((imageId) => {
+            formData.append("removed_screenshot_ids", imageId);
+        });
         const submitButton = tradeFormSubmitButton;
         const isEdit = Boolean(state.editingTradeId);
         const endpoint = isEdit ? buildTradeUpdateUrl(state.editingTradeId) : endpoints.trade;

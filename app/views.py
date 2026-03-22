@@ -79,6 +79,14 @@ def persist_request_language_for_user(request, user, language=None):
     return language
 
 
+def get_saved_language_for_user(user, fallback=None):
+    if not user or not getattr(user, 'pk', None):
+        return normalize_language(fallback)
+
+    preferences = get_or_create_preferences_for_user(user.pk)
+    return normalize_language(preferences.ui_language or fallback)
+
+
 def home_redirect(request):
     if request.user.is_authenticated:
         return redirect('app:dashboard')
@@ -128,7 +136,12 @@ class TradingLoginView(LoginView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        language = persist_request_language_for_user(self.request, form.get_user())
+        language = get_saved_language_for_user(
+            form.get_user(),
+            fallback=getattr(self.request, 'LANGUAGE_CODE', None),
+        )
+        translation.activate(language)
+        self.request.LANGUAGE_CODE = language
         return apply_language_cookie(response, language)
 
 
@@ -140,7 +153,9 @@ class RegisterView(FormView):
     def form_valid(self, form):
         user = form.save()
         login(self.request, user)
-        language = persist_request_language_for_user(self.request, user)
+        language = get_saved_language_for_user(user, fallback='fr')
+        translation.activate(language)
+        self.request.LANGUAGE_CODE = language
         response = super().form_valid(form)
         return apply_language_cookie(response, language)
 
@@ -163,7 +178,9 @@ class RegisterView(FormView):
 @require_POST
 def logout_view(request):
     logout(request)
-    return redirect('app:login')
+    response = redirect('app:login')
+    response.delete_cookie(settings.LANGUAGE_COOKIE_NAME)
+    return response
 
 
 @login_required
@@ -224,6 +241,7 @@ def tools_view(request):
 @login_required
 def settings_view(request):
     language = normalize_language(getattr(request, 'LANGUAGE_CODE', None))
+    response_language = None
     preferences = get_or_create_preferences_for_user(request.user.pk)
     active_account = get_or_create_active_account_for_user(request.user.pk, preferences)
     server_refresh = build_server_refresh_snapshot(language=language) if request.user.is_superuser else None
@@ -251,13 +269,30 @@ def settings_view(request):
         if action == 'preferences':
             preferences_form = TradingPreferenceForm(request.POST, instance=preferences, language=language)
             if preferences_form.is_valid():
+                selected_language = normalize_language(preferences_form.cleaned_data.get('ui_language'))
                 preferences = preferences_form.save()
                 active_account.name = active_account.name or 'Compte principal'
                 active_account.capital_base = preferences_form.cleaned_data['capital_base']
                 active_account.currency = preferences_form.cleaned_data['currency']
                 active_account.save(update_fields=['capital_base', 'currency', 'updated_at'])
                 preferences = sync_preferences_with_account(preferences, active_account)
+                if selected_language != language:
+                    language = selected_language
+                    response_language = language
+                    translation.activate(language)
+                    request.LANGUAGE_CODE = language
                 success_message = translate('views.success.configuration_saved', language=language, default='Configuration enregistree.')
+                preferences_form = TradingPreferenceForm(instance=preferences, language=language)
+                account_form = TradingAccountForm(prefix='create-account', initial={'currency': active_account.currency}, language=language)
+                edit_account_form = TradingAccountEditForm(
+                    instance=active_account,
+                    prefix='edit-account',
+                    initial={'set_active': True},
+                    language=language,
+                )
+                editing_account = active_account
+                password_form = TradingPasswordChangeForm(request.user, language=language)
+                delete_account_form = DeleteAccountForm(user=request.user, language=language)
         elif action == 'create_account':
             account_form = TradingAccountForm(request.POST, prefix='create-account', language=language)
             if account_form.is_valid():
@@ -403,10 +438,14 @@ def settings_view(request):
                 user = request.user
                 logout(request)
                 user.delete()
-                return redirect('app:login')
+                response = redirect('app:login')
+                response.delete_cookie(settings.LANGUAGE_COOKIE_NAME)
+                return response
 
     trading_accounts = get_trading_accounts_for_user(request.user.pk)
     archived_trading_accounts = get_archived_trading_accounts_for_user(request.user.pk)
+    if request.user.is_superuser:
+        server_refresh = build_server_refresh_snapshot(language=language)
     current_capital = get_current_capital_for_user(request.user.pk, preferences, account=active_account)
     initial_capital_gp_percent = (
         ((current_capital - active_account.capital_base) / active_account.capital_base) * Decimal('100')
@@ -414,7 +453,7 @@ def settings_view(request):
         else Decimal('0.00')
     ).quantize(Decimal('0.01'))
 
-    return render(
+    response = render(
         request,
         'app/settings.html',
         {
@@ -445,6 +484,9 @@ def settings_view(request):
             'server_refresh': server_refresh,
         },
     )
+    if response_language:
+        return apply_language_cookie(response, response_language)
+    return response
 
 
 @login_required

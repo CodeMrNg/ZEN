@@ -1,5 +1,7 @@
 from django.utils.translation import get_language
 
+from .translation_providers import translate_with_provider
+
 DEFAULT_LANGUAGE = "fr"
 RTL_LANGUAGES = set()
 
@@ -215,9 +217,9 @@ TRANSLATIONS = {
     "dashboard.trade_form.capital_impact": pack("Impact sur capital (%)", "Capital impact (%)", "Impacto sobre capital (%)", "Impacto sobre capital (%)"),
     "dashboard.trade_form.capital_hint": pack("Calcul base sur un capital actuel de {capital}.", "Calculated from the current capital of {capital}.", "Calculado sobre el capital actual de {capital}.", "Calculado com base no capital atual de {capital}."),
     "dashboard.trade_form.capital_help": pack("TP = gain, SL = perte, BE = 0.00%.", "TP = gain, SL = loss, BE = 0.00%.", "TP = ganancia, SL = perdida, BE = 0.00%.", "TP = ganho, SL = perda, BE = 0.00%."),
-    "dashboard.trade_form.image": pack("Image du trade", "Trade image", "Imagen del trade", "Imagem do trade"),
-    "dashboard.trade_form.image_help": pack("Image compressee automatiquement avant televersement.", "Image is compressed automatically before upload.", "La imagen se comprime automaticamente antes de subirla.", "A imagem e comprimida automaticamente antes do envio."),
-    "dashboard.trade_form.preview_empty": pack("Aucun fichier selectionne", "No file selected", "Ningun archivo seleccionado", "Nenhum arquivo selecionado"),
+    "dashboard.trade_form.image": pack("Images du trade", "Trade images", "Imagenes del trade", "Imagens do trade"),
+    "dashboard.trade_form.image_help": pack("Vous pouvez ajouter plusieurs images. Chaque image est compressee automatiquement avant televersement.", "You can add multiple images. Each image is compressed automatically before upload.", "Puede agregar varias imagenes. Cada imagen se comprime automaticamente antes de subirla.", "Voce pode adicionar varias imagens. Cada imagem e comprimida automaticamente antes do envio."),
+    "dashboard.trade_form.preview_empty": pack("Aucune image selectionnee", "No image selected", "Ninguna imagen seleccionada", "Nenhuma imagem selecionada"),
     "dashboard.trade_form.notes": pack("Notes", "Notes", "Notas", "Notas"),
     "dashboard.trade_form.notes_placeholder": pack("Contexte, execution, gestion du risque, observations...", "Context, execution, risk management, notes...", "Contexto, ejecucion, gestion del riesgo, observaciones...", "Contexto, execucao, gestao de risco, observacoes..."),
     "dashboard.trade_form.submit_caption": pack("Le trade est enregistre puis le tableau de bord est actualise automatiquement.", "The trade is saved and the dashboard refreshes automatically.", "El trade se guarda y el panel se actualiza automaticamente.", "O trade e salvo e o dashboard e atualizado automaticamente."),
@@ -484,10 +486,24 @@ def get_language_menu(language=None):
 
 def translate(key, language=None, default=None, **kwargs):
     code = normalize_language(language or get_current_language_code())
-    value = TRANSLATIONS.get(key, {}).get(code)
-    if value is None:
-        value = TRANSLATIONS.get(key, {}).get(DEFAULT_LANGUAGE, default or key)
-    return value.format(**kwargs) if kwargs else value
+    source_value = TRANSLATIONS.get(key, {}).get(DEFAULT_LANGUAGE, default or key)
+    source_text = source_value.format(**kwargs) if kwargs else source_value
+
+    if code == DEFAULT_LANGUAGE:
+        return source_text
+
+    provider_value = translate_with_provider(
+        source_text,
+        target_language=code,
+        source_language=DEFAULT_LANGUAGE,
+    )
+    if provider_value:
+        return provider_value
+
+    fallback_value = TRANSLATIONS.get(key, {}).get(code)
+    if fallback_value is None:
+        return source_text
+    return fallback_value.format(**kwargs) if kwargs else fallback_value
 
 
 def get_weekday_short_labels(language=None):

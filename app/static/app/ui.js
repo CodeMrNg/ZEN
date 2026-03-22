@@ -1,4 +1,15 @@
 (function () {
+    const langCode = (document.documentElement.lang || "fr").toLowerCase();
+    const strings = langCode.startsWith("fr") ? {
+        loading: "Chargement...",
+        activating: "Activation...",
+        accountSwitchFailed: "Le changement de compte a echoue.",
+    } : {
+        loading: "Loading...",
+        activating: "Activating...",
+        accountSwitchFailed: "Account switch failed.",
+    };
+
     function getCsrfToken() {
         const match = document.cookie.match(/csrftoken=([^;]+)/);
         return match ? decodeURIComponent(match[1]) : "";
@@ -23,7 +34,7 @@
                 button.dataset.restoreHtml = button.innerHTML;
             }
 
-            const label = loadingText || button.dataset.loadingText || button.textContent.trim() || "Chargement...";
+            const label = loadingText || button.dataset.loadingText || button.textContent.trim() || strings.loading;
             button.classList.add("is-loading");
             button.disabled = true;
             button.setAttribute("aria-busy", "true");
@@ -180,7 +191,7 @@
                 return;
             }
 
-            setButtonLoading(button, true, button.dataset.loadingText || "Activation...");
+            setButtonLoading(button, true, button.dataset.loadingText || strings.activating);
 
             try {
                 const formData = new FormData();
@@ -197,13 +208,13 @@
                 const payload = await response.json();
 
                 if (!response.ok || !payload.ok) {
-                    throw new Error(payload.message || "Le changement de compte a echoue.");
+                    throw new Error(payload.message || strings.accountSwitchFailed);
                 }
 
                 window.location.reload();
             } catch (error) {
                 setButtonLoading(button, false);
-                showUiToast(error.message || "Le changement de compte a echoue.");
+                showUiToast(error.message || strings.accountSwitchFailed);
             }
         });
     }

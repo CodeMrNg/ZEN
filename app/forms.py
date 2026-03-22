@@ -33,6 +33,42 @@ def remove_autofocus_from_fields(form):
         field.widget.attrs.pop('autofocus', None)
 
 
+class MultipleImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleImageField(forms.FileField):
+    widget = MultipleImageInput
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_field = forms.ImageField(required=False)
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+
+        if not isinstance(data, (list, tuple)):
+            data = [data]
+
+        cleaned_files = []
+        errors = []
+        for uploaded_file in data:
+            if not uploaded_file:
+                continue
+            try:
+                cleaned_file = super().clean(uploaded_file, initial)
+                self.image_field.clean(cleaned_file)
+                cleaned_files.append(cleaned_file)
+            except forms.ValidationError as error:
+                errors.extend(error.error_list)
+
+        if errors:
+            raise forms.ValidationError(errors)
+
+        return cleaned_files
+
+
 class LoginForm(AuthenticationForm):
     username = forms.CharField(
         label='Identifiant',
@@ -190,6 +226,10 @@ class TradeCreateForm(forms.ModelForm):
         label='Capture du trade',
         required=False,
     )
+    screenshots = MultipleImageField(
+        label='Images du trade',
+        required=False,
+    )
 
     class Meta:
         model = Trade
@@ -286,6 +326,7 @@ class TradingPreferenceForm(forms.ModelForm):
     class Meta:
         model = TradingPreference
         fields = (
+            'ui_language',
             'default_symbol',
             'default_direction',
             'default_setup',
@@ -314,6 +355,7 @@ class TradingPreferenceForm(forms.ModelForm):
         if active_account and not self.is_bound:
             self.fields['capital_base'].initial = active_account.capital_base
             self.fields['currency'].initial = active_account.currency
+        self.fields['ui_language'].label = tr(self.language, 'language.title', "Langue de l'application")
         self.fields['default_symbol'].label = tr(self.language, 'form.preferences.default_symbol', 'Paire par defaut')
         self.fields['default_direction'].label = tr(self.language, 'form.preferences.default_direction', 'Direction par defaut')
         self.fields['default_setup'].label = tr(self.language, 'form.preferences.default_setup', 'Setup par defaut')
@@ -340,9 +382,21 @@ class TradingPreferenceForm(forms.ModelForm):
                 'XOF': tr(self.language, 'currency.xof', 'Franc CFA BCEAO (XOF)'),
             },
         )
+        apply_choice_labels(
+            self.fields['ui_language'],
+            {
+                'fr': tr(self.language, 'language.option.fr', 'Francais' if self.language == 'fr' else 'French'),
+                'en': tr(self.language, 'language.option.en', 'Anglais' if self.language == 'fr' else 'English'),
+            },
+        )
         self.fields['default_symbol'].widget.attrs.update(
             {
                 'placeholder': 'XAUUSD',
+                'autocomplete': 'off',
+            }
+        )
+        self.fields['ui_language'].widget.attrs.update(
+            {
                 'autocomplete': 'off',
             }
         )

@@ -62,6 +62,7 @@ if (transactionsAppNode) {
         chartMissing: "Chart.js is not loaded. Check asset loading.",
         monthlyGp: "Monthly P/L",
     };
+    const currencyUtils = window.AkiliCurrency || {};
     const setButtonLoading = window.AkiliUI?.setButtonLoading || ((button, isLoading, label) => {
         if (!button) {
             return;
@@ -197,6 +198,25 @@ if (transactionsAppNode) {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
+    }
+
+    function formatCurrency(value) {
+        if (typeof currencyUtils.formatCurrency === "function") {
+            return currencyUtils.formatCurrency(value, {
+                currency: transactionsAppNode.dataset.currencyCode || "USD",
+                locale: uiLocale,
+            });
+        }
+        const amount = Number.parseFloat(value || 0);
+        if (Number.isNaN(amount)) {
+            return "--";
+        }
+        return new Intl.NumberFormat(uiLocale, {
+            style: "currency",
+            currency: transactionsAppNode.dataset.currencyCode || "USD",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount).replace(/([.,])00(?=(?:\s*[^\d\s]+)?\s*$)/, "");
     }
 
     function updateModalOpenState() {
@@ -429,6 +449,15 @@ if (transactionsAppNode) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label(context) {
+                                const label = context.dataset?.label ? `${context.dataset.label}: ` : "";
+                                const numericValue = context.parsed?.y ?? context.parsed ?? 0;
+                                return `${label}${formatCurrency(numericValue)}`;
+                            },
+                        },
+                    },
                 },
                 scales: {
                     x: {
@@ -444,6 +473,7 @@ if (transactionsAppNode) {
                         ticks: {
                             color: "#c6cee1",
                             font: { family: "Manrope", size: 11 },
+                            callback: (value) => formatCurrency(value),
                         },
                         grid: {
                             color: "rgba(255,255,255,0.06)",

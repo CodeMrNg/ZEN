@@ -1,6 +1,6 @@
 from django import template
 
-from app.formatting import format_decimal_compact
+from app.formatting import format_decimal_compact, format_decimal_thousands_compact
 from app.localization import normalize_language, translate
 
 register = template.Library()
@@ -31,3 +31,16 @@ def compact_number_grouped(value, decimals=2):
     except (TypeError, ValueError):
         decimal_places = 2
     return format_decimal_compact(value, decimal_places=decimal_places, use_grouping=True)
+
+
+@register.filter
+def compact_amount(value, decimals=2):
+    try:
+        decimal_places = int(decimals)
+    except (TypeError, ValueError):
+        decimal_places = 2
+    return format_decimal_thousands_compact(
+        value,
+        decimal_places=decimal_places,
+        use_grouping_below_threshold=True,
+    )

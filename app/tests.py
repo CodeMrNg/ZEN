@@ -13,6 +13,7 @@ from django.utils import timezone
 from .error_views import custom_page_not_found, custom_server_error
 from .localization import translate
 from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
+from .services import format_currency, format_signed_value
 
 
 class DashboardAccessTests(TestCase):
@@ -90,6 +91,17 @@ class LocalizationProviderTests(SimpleTestCase):
         value = translate("dashboard.header.title", language="en")
 
         self.assertEqual(value, "Performance dashboard")
+
+
+class CurrencyFormattingTests(SimpleTestCase):
+    def test_format_currency_uses_k_suffix_from_one_thousand(self):
+        self.assertEqual(format_currency(Decimal("1000.00"), "USD"), "$1k")
+        self.assertEqual(format_currency(Decimal("1500.00"), "USD"), "$1.5k")
+        self.assertEqual(format_currency(Decimal("25000.00"), "USD"), "$25k")
+
+    def test_format_signed_value_keeps_sign_with_compact_amounts(self):
+        self.assertEqual(format_signed_value(Decimal("25000.00")), "+25k")
+        self.assertEqual(format_signed_value(Decimal("-1500.00")), "-1.5k")
 
 
 @override_settings(APP_TRANSLATION_PROVIDER="builtin")
@@ -176,7 +188,7 @@ class TradingJournalApiTests(TestCase):
         self.assertIn('trade_map', payload['calendar'])
         self.assertEqual(payload['preferences']['default_symbol'], 'XAUUSD')
         self.assertEqual(payload['preferences']['currency'], 'USD')
-        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,095')
+        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10.1k')
         self.assertEqual(len(payload['recent_trades']), 1)
         self.assertEqual(len(payload['monthly_trades']), 1)
 
@@ -479,7 +491,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload['recent_trades'][0]['capital_change_percent_label'], '+0.80%')
-        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,080')
+        self.assertEqual(payload['preferences']['current_capital_formatted'], '$10.08k')
 
     def test_trade_creation_api_creates_trade(self):
         TradingPreference.objects.update_or_create(
@@ -862,7 +874,7 @@ class TradingJournalApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload['summary']['current_capital_label'], '$10,345')
+        self.assertEqual(payload['summary']['current_capital_label'], '$10.34k')
         self.assertEqual(payload['summary']['trade_count_month'], 1)
         self.assertEqual(payload['summary']['winners_month'], 1)
         self.assertEqual(payload['summary']['losers_month'], 0)
@@ -874,8 +886,8 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(len(payload['all_movements']), 2)
         self.assertEqual(payload['all_movements'][0]['kind'], 'WITHDRAWAL')
         self.assertEqual(payload['all_movements'][1]['kind'], 'DEPOSIT')
-        self.assertEqual(payload['monthly_history'][0]['capital_start_label'], '$9,950')
-        self.assertEqual(payload['monthly_history'][1]['capital_start_label'], '$10,000')
+        self.assertEqual(payload['monthly_history'][0]['capital_start_label'], '$9.95k')
+        self.assertEqual(payload['monthly_history'][1]['capital_start_label'], '$10k')
         self.assertEqual(payload['monthly_history'][0]['trade_count'], 1)
         self.assertEqual(payload['monthly_history'][0]['winners'], 1)
         self.assertEqual(payload['monthly_history'][0]['losers'], 0)
@@ -1080,8 +1092,8 @@ class TradingJournalApiTests(TestCase):
         response = self.client.get(reverse('app:settings'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '$10,395')
-        self.assertContains(response, '$10,000')
+        self.assertContains(response, '$10.4k')
+        self.assertContains(response, '$10k')
         self.assertContains(response, '+3.95%')
         self.assertContains(response, 'Capital initial')
 
@@ -1308,7 +1320,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['overview']['all_time_trade_count'], 1)
         self.assertEqual(payload['overview']['best_setup'], 'Secondary account trade')
         self.assertEqual(payload['preferences']['active_account']['name'], 'Compte prop')
-        self.assertIn('5,300', payload['preferences']['current_capital_formatted'])
+        self.assertIn('5.3k', payload['preferences']['current_capital_formatted'])
 
     def test_dashboard_renders_only_three_active_global_social_links(self):
         self.get_active_account()

@@ -156,6 +156,7 @@ if (appNode) {
         countdownMinute: "m",
         countdownSecond: "s",
     };
+    const currencyUtils = window.AkiliCurrency || {};
     const setButtonLoading = window.AkiliUI?.setButtonLoading || ((button, isLoading, label) => {
         if (!button) {
             return;
@@ -465,6 +466,9 @@ if (appNode) {
     }
 
     function formatCurrency(value, currency = "USD") {
+        if (typeof currencyUtils.formatCurrency === "function") {
+            return currencyUtils.formatCurrency(value, { currency, locale: uiLocale });
+        }
         const amount = Number.parseFloat(value || 0);
         if (Number.isNaN(amount)) {
             return trimTrailingZeroDecimals(new Intl.NumberFormat(uiLocale, {
@@ -484,6 +488,10 @@ if (appNode) {
 
     function formatCompactNumber(value, digits = 2) {
         return trimTrailingZeroDecimals(Number(value).toFixed(digits));
+    }
+
+    function getActiveCurrencyCode() {
+        return state.preferences?.currency || appNode.dataset.currencyCode || "USD";
     }
 
     function buildInitialPreferences() {
@@ -1893,6 +1901,15 @@ if (appNode) {
                             boxWidth: 12,
                         },
                     },
+                    tooltip: {
+                        callbacks: {
+                            label(context) {
+                                const label = context.dataset?.label ? `${context.dataset.label}: ` : "";
+                                const numericValue = context.parsed?.y ?? context.parsed ?? 0;
+                                return `${label}${formatCurrency(numericValue, getActiveCurrencyCode())}`;
+                            },
+                        },
+                    },
                 },
                 scales: {
                     x: {
@@ -1900,12 +1917,18 @@ if (appNode) {
                         grid: { color: "transparent" },
                     },
                     y: {
-                        ticks: { color: textColor },
+                        ticks: {
+                            color: textColor,
+                            callback: (value) => formatCurrency(value, getActiveCurrencyCode()),
+                        },
                         grid: { color: gridColor },
                     },
                     y1: {
                         position: "right",
-                        ticks: { color: textColor },
+                        ticks: {
+                            color: textColor,
+                            callback: (value) => formatCurrency(value, getActiveCurrencyCode()),
+                        },
                         grid: { drawOnChartArea: false },
                     },
                 },
@@ -1919,6 +1942,15 @@ if (appNode) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const label = context.dataset?.label ? `${context.dataset.label}: ` : "";
+                            const numericValue = context.parsed?.y ?? context.parsed ?? 0;
+                            return `${label}${formatCurrency(numericValue, getActiveCurrencyCode())}`;
+                        },
+                    },
+                },
             },
             scales: {
                 x: {
@@ -1926,7 +1958,10 @@ if (appNode) {
                     grid: { color: "transparent" },
                 },
                 y: {
-                    ticks: { color: textColor },
+                    ticks: {
+                        color: textColor,
+                        callback: (value) => formatCurrency(value, getActiveCurrencyCode()),
+                    },
                     grid: { color: gridColor },
                 },
             },

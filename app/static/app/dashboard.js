@@ -156,7 +156,6 @@ if (appNode) {
         countdownMinute: "m",
         countdownSecond: "s",
     };
-    const currencyUtils = window.AkiliCurrency || {};
     const setButtonLoading = window.AkiliUI?.setButtonLoading || ((button, isLoading, label) => {
         if (!button) {
             return;
@@ -371,6 +370,7 @@ if (appNode) {
         });
         imageViewerRemoveButton.addEventListener("click", handleImageViewerRemove);
         window.addEventListener("resize", handleImageViewerViewportChange);
+        window.addEventListener("resize", handleCalendarResize);
         document.addEventListener("keydown", handleImageViewerKeydown);
         document.addEventListener("keydown", (event) => {
             if (event.key !== "Escape") {
@@ -466,9 +466,6 @@ if (appNode) {
     }
 
     function formatCurrency(value, currency = "USD") {
-        if (typeof currencyUtils.formatCurrency === "function") {
-            return currencyUtils.formatCurrency(value, { currency, locale: uiLocale });
-        }
         const amount = Number.parseFloat(value || 0);
         if (Number.isNaN(amount)) {
             return trimTrailingZeroDecimals(new Intl.NumberFormat(uiLocale, {
@@ -490,8 +487,40 @@ if (appNode) {
         return trimTrailingZeroDecimals(Number(value).toFixed(digits));
     }
 
-    function getActiveCurrencyCode() {
-        return state.preferences?.currency || appNode.dataset.currencyCode || "USD";
+    function trimCompactCalendarDecimals(value) {
+        return String(value ?? "")
+            .replace(/(\.\d*?[1-9])0+$/, "$1")
+            .replace(/\.0+$/, "");
+    }
+
+    function isMobileCalendarViewport() {
+        return window.innerWidth <= 860;
+    }
+
+    function formatMobileCalendarAmount(amount) {
+        const numericAmount = Number.parseFloat(amount || 0);
+        const currency = state.preferences?.currency || appNode.dataset.currencyCode || "USD";
+        const currencySymbols = {
+            USD: "$",
+            EUR: "\u20AC",
+            GBP: "\u00A3",
+            CHF: "CHF ",
+            XAF: "FCFA ",
+            XOF: "CFA ",
+        };
+
+        if (!Number.isFinite(numericAmount)) {
+            return formatCurrency(0, currency);
+        }
+
+        if (Math.abs(numericAmount) < 1000) {
+            return formatCurrency(numericAmount, currency);
+        }
+
+        const sign = numericAmount < 0 ? "-" : "";
+        const symbol = currencySymbols[currency] || `${currency} `;
+        const compactValue = trimCompactCalendarDecimals((Math.abs(numericAmount) / 1000).toFixed(2));
+        return `${sign}${symbol}${compactValue}k`;
     }
 
     function buildInitialPreferences() {
@@ -1901,15 +1930,6 @@ if (appNode) {
                             boxWidth: 12,
                         },
                     },
-                    tooltip: {
-                        callbacks: {
-                            label(context) {
-                                const label = context.dataset?.label ? `${context.dataset.label}: ` : "";
-                                const numericValue = context.parsed?.y ?? context.parsed ?? 0;
-                                return `${label}${formatCurrency(numericValue, getActiveCurrencyCode())}`;
-                            },
-                        },
-                    },
                 },
                 scales: {
                     x: {
@@ -1917,18 +1937,12 @@ if (appNode) {
                         grid: { color: "transparent" },
                     },
                     y: {
-                        ticks: {
-                            color: textColor,
-                            callback: (value) => formatCurrency(value, getActiveCurrencyCode()),
-                        },
+                        ticks: { color: textColor },
                         grid: { color: gridColor },
                     },
                     y1: {
                         position: "right",
-                        ticks: {
-                            color: textColor,
-                            callback: (value) => formatCurrency(value, getActiveCurrencyCode()),
-                        },
+                        ticks: { color: textColor },
                         grid: { drawOnChartArea: false },
                     },
                 },
@@ -1942,15 +1956,6 @@ if (appNode) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label(context) {
-                            const label = context.dataset?.label ? `${context.dataset.label}: ` : "";
-                            const numericValue = context.parsed?.y ?? context.parsed ?? 0;
-                            return `${label}${formatCurrency(numericValue, getActiveCurrencyCode())}`;
-                        },
-                    },
-                },
             },
             scales: {
                 x: {
@@ -1958,10 +1963,7 @@ if (appNode) {
                     grid: { color: "transparent" },
                 },
                 y: {
-                    ticks: {
-                        color: textColor,
-                        callback: (value) => formatCurrency(value, getActiveCurrencyCode()),
-                    },
+                    ticks: { color: textColor },
                     grid: { color: gridColor },
                 },
             },
@@ -2000,7 +2002,9 @@ if (appNode) {
                 const otherClass = day.in_month ? "" : "is-other";
                 const clickableClass = day.in_month && day.trade_count ? "is-clickable" : "";
                 const subtitle = day.trade_count ? `${day.trade_count} ${strings.dayTradeCountSuffix}` : strings.noExecution;
-                const pnlLabel = trimCalendarAmount(day.pnl_formatted);
+                const pnlLabel = isMobileCalendarViewport()
+                    ? formatMobileCalendarAmount(day.pnl)
+                    : trimCalendarAmount(day.pnl_formatted);
 
                 if (day.in_month && day.trade_count) {
                     return `
@@ -2090,6 +2094,20 @@ if (appNode) {
         }
 
         monthTradesList.innerHTML = trades.map((trade) => buildTradeCardMarkup(trade)).join("");
+    }
+
+    function handleCalendarResize() {
+        if (!state.lastPayload?.calendar) {
+            return;
+        }
+
+        renderCalendar(state.lastPayload.calendar);
+
+        if (!panelModal.hidden && !expandedCalendarWrap.hidden) {
+            const { gridHtml, weekHtml } = buildCalendarMarkup(state.lastPayload.calendar);
+            expandedCalendarGrid.innerHTML = gridHtml;
+            expandedCalendarWeeks.innerHTML = weekHtml;
+        }
     }
 
     function handleTradeCardClick(event) {

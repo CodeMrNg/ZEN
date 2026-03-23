@@ -10,7 +10,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from .formatting import format_decimal_compact, format_decimal_thousands_compact
+from .formatting import format_decimal_compact
 from .localization import normalize_language, translate
 from .models import (
     CURRENCY_SYMBOLS,
@@ -90,13 +90,13 @@ def format_currency(value, currency='USD'):
     amount = float(value)
     sign = '-' if amount < 0 else ''
     symbol = CURRENCY_SYMBOLS.get(currency, f'{currency} ')
-    return f'{sign}{symbol}{format_decimal_thousands_compact(abs(value), decimal_places=2, use_grouping_below_threshold=True)}'
+    return f'{sign}{symbol}{format_decimal_compact(abs(value), decimal_places=2, use_grouping=True)}'
 
 
 def format_signed_value(value):
     amount = float(value)
     sign = '+' if amount > 0 else ''
-    return f'{sign}{format_decimal_thousands_compact(value, decimal_places=2, use_grouping_below_threshold=True)}'
+    return f'{sign}{format_decimal_compact(value, decimal_places=2, use_grouping=True)}'
 
 
 def format_signed_percent(value):
@@ -680,6 +680,7 @@ def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_da
         week_summaries.append(
             {
                 'label': tr('calendar.week', language=language, default='Semaine {index}', index=index),
+                'pnl': week_pnl,
                 'pnl_formatted': format_currency(week_pnl, currency),
                 'active_days': active_days,
                 'tone': 'profit' if week_pnl > 0 else 'loss' if week_pnl < 0 else 'flat',

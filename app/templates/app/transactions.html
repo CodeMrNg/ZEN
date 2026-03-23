@@ -14,7 +14,6 @@
     id="transactions-app"
     data-transactions-url="{% url 'app:transactions-data' %}"
     data-movement-url="{% url 'app:capital-movement-create' %}"
-    data-currency-code="{{ active_account.currency }}"
 >
     <aside class="sidebar" data-sidebar>
         <div class="sidebar-topbar">
@@ -51,9 +50,9 @@
 
         <article class="sidebar-card">
             <span>{% tr 'transactions.sidebar.current_capital' 'Capital actuel' %}</span>
-            <strong id="transactions-current-capital">{{ trade_preferences.currency_symbol }}{{ trade_preferences.capital_base|compact_amount }}</strong>
+            <strong id="transactions-current-capital">{{ trade_preferences.currency_symbol }}{{ trade_preferences.capital_base|compact_number_grouped }}</strong>
             <p id="transactions-capital-copy">
-                {% with capital_number=trade_preferences.capital_base|compact_amount %}
+                {% with capital_number=trade_preferences.capital_base|compact_number_grouped %}
                 {% with capital_value=trade_preferences.currency_symbol|add:capital_number %}
                     {% tr 'transactions.sidebar.pending_sync' 'Base {capital} | Synchronisation en attente.' capital=capital_value %}
                 {% endwith %}

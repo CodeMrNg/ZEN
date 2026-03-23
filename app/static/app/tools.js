@@ -7,7 +7,6 @@
     const langCode = (document.documentElement.lang || "fr").toLowerCase();
     const locale = document.body.dataset.uiLocale || "fr-FR";
     const currencyCode = app.dataset.currencyCode || "USD";
-    const currencyUtils = window.AkiliCurrency || {};
     const toolsModal = document.getElementById("tools-modal");
     const toolsModalTitle = document.getElementById("tools-modal-title");
     const toolsModalCopy = document.getElementById("tools-modal-copy");
@@ -70,9 +69,6 @@
     function formatCurrency(value) {
         if (!Number.isFinite(value)) {
             return "--";
-        }
-        if (typeof currencyUtils.formatCurrency === "function") {
-            return currencyUtils.formatCurrency(value, { currency: currencyCode, locale });
         }
         return trimTrailingZeroDecimals(new Intl.NumberFormat(locale, {
             style: "currency",

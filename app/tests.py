@@ -1,3 +1,5 @@
+import calendar
+import re
 import shutil
 import tempfile
 from datetime import datetime, timedelta
@@ -6,10 +8,12 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from . import services
 from .error_views import custom_page_not_found, custom_server_error
 from .localization import translate
 from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
@@ -180,6 +184,26 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(len(payload['recent_trades']), 1)
         self.assertEqual(len(payload['monthly_trades']), 1)
 
+    def test_dashboard_view_repairs_invalid_sqlite_decimal_storage(self):
+        if connection.vendor != 'sqlite':
+            self.skipTest('SQLite-specific regression.')
+
+        trade = self.create_trade()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'UPDATE app_trade SET rr_ratio = %s, gp_value = %s WHERE id = %s',
+                ['', '', trade.id],
+            )
+
+        services._sqlite_decimal_repair_complete = False
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        trade.refresh_from_db()
+        self.assertIsNone(trade.rr_ratio)
+        self.assertIsNone(trade.gp_value)
+
     def test_dashboard_api_limits_recent_trades_to_five_and_exposes_full_month_list(self):
         account = self.get_active_account()
         now = timezone.now()
@@ -288,6 +312,59 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['available_years'][1]['value'], str(previous_year))
         self.assertTrue(all(option['value'].startswith(f'{previous_year}-') for option in payload['available_months']))
 
+    def test_dashboard_api_applies_saved_week_start_day_to_calendar_rows(self):
+        account = self.get_active_account()
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 4, 2, 10, 30)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Week start trade',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('1.50'),
+            exit_price=Decimal('1.1000'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('100.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=Decimal('0.50'),
+            capital_base=Decimal('10000.00'),
+            confidence=4,
+        )
+        preferences = TradingPreference.objects.get(user=self.user)
+
+        preferences.default_week_start_day = calendar.SUNDAY
+        preferences.save(update_fields=['default_week_start_day', 'updated_at'])
+
+        sunday_response = self.client.get(
+            reverse('app:dashboard-data'),
+            {'month': '2026-04', 'year': '2026'},
+        )
+
+        self.assertEqual(sunday_response.status_code, 200)
+        sunday_payload = sunday_response.json()
+        self.assertEqual(sunday_payload['calendar']['week_start_day'], calendar.SUNDAY)
+        self.assertEqual(sunday_payload['calendar']['weekday_labels'][0], 'Dim')
+        self.assertEqual(sunday_payload['calendar']['rows'][0][0]['iso'], '2026-03-29')
+
+        preferences.default_week_start_day = calendar.MONDAY
+        preferences.save(update_fields=['default_week_start_day', 'updated_at'])
+
+        monday_response = self.client.get(
+            reverse('app:dashboard-data'),
+            {'month': '2026-04', 'year': '2026'},
+        )
+
+        self.assertEqual(monday_response.status_code, 200)
+        monday_payload = monday_response.json()
+        self.assertEqual(monday_payload['calendar']['week_start_day'], calendar.MONDAY)
+        self.assertEqual(monday_payload['calendar']['weekday_labels'][0], 'Lun')
+        self.assertEqual(monday_payload['calendar']['rows'][0][0]['iso'], '2026-03-30')
+
     def test_settings_view_saves_default_dashboard_year_when_previous_year_exists(self):
         account = self.get_active_account()
         previous_year = timezone.localdate().year - 1
@@ -325,6 +402,7 @@ class TradingJournalApiTests(TestCase):
                 'default_fees': '3.75',
                 'default_confidence': '4',
                 'default_dashboard_year': str(previous_year),
+                'default_week_start_day': str(calendar.SUNDAY),
                 'capital_base': '25000.00',
                 'currency': 'EUR',
             },
@@ -347,6 +425,7 @@ class TradingJournalApiTests(TestCase):
                 'default_fees': '3.75',
                 'default_confidence': '4',
                 'default_dashboard_year': str(timezone.localdate().year),
+                'default_week_start_day': str(calendar.SUNDAY),
                 'capital_base': '25000.00',
                 'currency': 'EUR',
             },
@@ -388,6 +467,31 @@ class TradingJournalApiTests(TestCase):
         self.assertNotContains(settings_response, 'value="pt"', html=False)
         self.assertNotContains(settings_response, 'value="ar"', html=False)
         self.assertNotContains(settings_response, 'value="zh-hans"', html=False)
+
+    def test_dashboard_view_renders_weekday_headers_from_saved_week_start_day(self):
+        self.get_active_account()
+        preferences = TradingPreference.objects.get(user=self.user)
+        preferences.default_week_start_day = calendar.TUESDAY
+        preferences.save(update_fields=['default_week_start_day', 'updated_at'])
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        weekdays_block = re.search(r'<div class="calendar-weekdays">(.*?)</div>', content, re.S)
+        self.assertIsNotNone(weekdays_block)
+        block = weekdays_block.group(1)
+        self.assertLess(block.index('<span>Mar</span>'), block.index('<span>Lun</span>'))
+        self.assertLess(block.index('<span>Dim</span>'), block.index('<span>Lun</span>'))
+
+    def test_dashboard_view_does_not_mark_trade_symbol_for_initial_focus(self):
+        self.get_active_account()
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-trade-initial-focus', html=False)
+        self.assertNotContains(response, 'autofocus', html=False)
 
     def test_login_uses_saved_user_language_instead_of_request_cookie(self):
         TradingPreference.objects.update_or_create(
@@ -879,8 +983,73 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['monthly_history'][0]['trade_count'], 1)
         self.assertEqual(payload['monthly_history'][0]['winners'], 1)
         self.assertEqual(payload['monthly_history'][0]['losers'], 0)
+        self.assertEqual(payload['monthly_history'][0]['progress_label'], '+3.97%')
+        self.assertEqual(payload['monthly_history'][0]['progress_tone'], 'profit')
+        self.assertEqual(payload['monthly_history'][1]['progress_label'], '-0.50%')
+        self.assertEqual(payload['monthly_history'][1]['progress_tone'], 'loss')
         self.assertTrue(payload['monthly_history'][0]['is_best_month'])
         self.assertTrue(payload['monthly_history'][1]['is_worst_month'])
+
+    @patch("app.services.timezone.localdate")
+    def test_transactions_api_does_not_mark_current_month_as_worst_month(self, mock_localdate):
+        mock_localdate.return_value = datetime(2026, 4, 7).date()
+        account = self.get_active_account()
+
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 4, 5, 9, 0)),
+            symbol='EURUSD',
+            market='Forex',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.STOP_LOSS,
+            setup='Pullback',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('-1.00'),
+            exit_price=Decimal('1.0950'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('-50.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=Decimal('0.50'),
+            capital_base=account.capital_base,
+            confidence=3,
+            notes='Mois courant en baisse',
+        )
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 3, 10, 9, 0)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Breakout',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('2.00'),
+            exit_price=Decimal('1.1200'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('100.00'),
+            fees=Decimal('0.00'),
+            risk_amount=Decimal('50.00'),
+            risk_percent=Decimal('0.50'),
+            capital_base=account.capital_base,
+            confidence=4,
+            notes='Mois precedent positif',
+        )
+
+        response = self.client.get(reverse('app:transactions-data'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['highlights']['worst_month_label'], '--')
+        self.assertEqual(payload['monthly_history'][0]['month_key'], '2026-04')
+        self.assertFalse(payload['monthly_history'][0]['is_worst_month'])
+        self.assertEqual(payload['monthly_history'][1]['month_key'], '2026-03')
+        self.assertFalse(payload['monthly_history'][1]['is_worst_month'])
+        self.assertTrue(payload['monthly_history'][1]['is_best_month'])
 
     def test_capital_movement_create_api_creates_withdrawal(self):
         response = self.client.post(
@@ -1043,6 +1212,7 @@ class TradingJournalApiTests(TestCase):
                 'default_fees': '3.75',
                 'default_confidence': '4',
                 'default_dashboard_year': str(timezone.localdate().year),
+                'default_week_start_day': str(calendar.MONDAY),
                 'capital_base': '25000.00',
                 'currency': 'EUR',
             },
@@ -1056,6 +1226,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(preferences.ui_language, 'fr')
         self.assertEqual(preferences.capital_base, Decimal('25000.00'))
         self.assertEqual(preferences.currency, TradingPreference.Currency.EUR)
+        self.assertEqual(preferences.default_week_start_day, calendar.MONDAY)
         self.assertContains(response, 'Configuration enregistree.')
 
     def test_settings_view_displays_current_and_initial_capital_metrics(self):

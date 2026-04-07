@@ -247,6 +247,15 @@ class TradingPreference(models.Model):
         XAF = 'XAF', 'Franc CFA BEAC (XAF)'
         XOF = 'XOF', 'Franc CFA BCEAO (XOF)'
 
+    class WeekStartDay(models.IntegerChoices):
+        MONDAY = calendar.MONDAY, 'Monday'
+        TUESDAY = calendar.TUESDAY, 'Tuesday'
+        WEDNESDAY = calendar.WEDNESDAY, 'Wednesday'
+        THURSDAY = calendar.THURSDAY, 'Thursday'
+        FRIDAY = calendar.FRIDAY, 'Friday'
+        SATURDAY = calendar.SATURDAY, 'Saturday'
+        SUNDAY = calendar.SUNDAY, 'Sunday'
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -305,6 +314,10 @@ class TradingPreference(models.Model):
         default='fr',
     )
     default_dashboard_year = models.PositiveSmallIntegerField(default=current_local_year)
+    default_week_start_day = models.PositiveSmallIntegerField(
+        choices=WeekStartDay.choices,
+        default=calendar.SUNDAY,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

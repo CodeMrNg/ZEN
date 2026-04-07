@@ -191,15 +191,16 @@
                     <table class="history-table">
                         <thead>
                             <tr>
-                                <th>{% tr 'transactions.history.month' 'Mois' %}</th>
-                                <th>{% tr 'transactions.history.capital_start' 'Capital debut' %}</th>
-                                <th>G/P</th>
-                                <th>{% tr 'transactions.history.deposits' 'Depots' %}</th>
-                                <th>{% tr 'transactions.history.withdrawals' 'Retraits' %}</th>
-                                <th>{% tr 'transactions.history.net' 'Net' %}</th>
-                                <th>{% tr 'transactions.history.trades' 'Trades' %}</th>
-                                <th>{% tr 'transactions.history.winners' 'Gagnants' %}</th>
-                                <th>{% tr 'transactions.history.losers' 'Perdants' %}</th>
+                                <th class="history-col-month">{% tr 'transactions.history.month' 'Mois' %}</th>
+                                <th class="history-col-money">{% tr 'transactions.history.capital_start' 'Capital debut' %}</th>
+                                <th class="history-col-money">G/P</th>
+                                <th class="history-col-money">{% tr 'transactions.history.deposits' 'Depots' %}</th>
+                                <th class="history-col-money">{% tr 'transactions.history.withdrawals' 'Retraits' %}</th>
+                                <th class="history-col-net">{% tr 'transactions.history.net' 'Net' %}</th>
+                                <th class="history-col-progress">{% tr 'transactions.history.progress' 'Progression (%)' %}</th>
+                                <th class="history-col-count">{% tr 'transactions.history.trades' 'Trades' %}</th>
+                                <th class="history-col-count">{% tr 'transactions.history.winners' 'Gagnants' %}</th>
+                                <th class="history-col-count">{% tr 'transactions.history.losers' 'Perdants' %}</th>
                             </tr>
                         </thead>
                         <tbody id="history-table-body"></tbody>
@@ -280,5 +281,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-    <script src="{% static 'app/transactions.js' %}" defer></script>
+    <script src="{% static 'app/transactions.js' %}?v={{ app_static_version }}" defer></script>
 {% endblock %}

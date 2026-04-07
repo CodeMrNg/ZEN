@@ -497,30 +497,58 @@ if (appNode) {
         return window.innerWidth <= 860;
     }
 
-    function formatMobileCalendarAmount(amount) {
-        const numericAmount = Number.parseFloat(amount || 0);
-        const currency = state.preferences?.currency || appNode.dataset.currencyCode || "USD";
+    function getCurrencySymbol(currency) {
         const currencySymbols = {
             USD: "$",
             EUR: "\u20AC",
             GBP: "\u00A3",
-            CHF: "CHF ",
-            XAF: "FCFA ",
-            XOF: "CFA ",
+            CHF: "CHF",
+            XAF: "FCFA",
+            XOF: "CFA",
         };
 
+        return currencySymbols[currency] || currency;
+    }
+
+    function isCurrencySymbolLeading(currency) {
+        const parts = new Intl.NumberFormat(uiLocale, {
+            style: "currency",
+            currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).formatToParts(1);
+        const currencyIndex = parts.findIndex((part) => part.type === "currency");
+        const integerIndex = parts.findIndex((part) => part.type === "integer");
+        return currencyIndex !== -1 && (integerIndex === -1 || currencyIndex < integerIndex);
+    }
+
+    function joinMobileCurrencyLabel(valueLabel, currency, isNegative = false) {
+        const symbol = getCurrencySymbol(currency);
+        const sign = isNegative ? "-" : "";
+        return isCurrencySymbolLeading(currency)
+            ? `${sign}${symbol}${valueLabel}`
+            : `${sign}${valueLabel} ${symbol}`;
+    }
+
+    function formatMobileCalendarAmount(amount) {
+        const numericAmount = Number.parseFloat(amount || 0);
+        const currency = state.preferences?.currency || appNode.dataset.currencyCode || "USD";
+
         if (!Number.isFinite(numericAmount)) {
-            return formatCurrency(0, currency);
+            return joinMobileCurrencyLabel("0", currency);
         }
 
         if (Math.abs(numericAmount) < 1000) {
-            return formatCurrency(numericAmount, currency);
+            const amountLabel = trimTrailingZeroDecimals(new Intl.NumberFormat(uiLocale, {
+                style: "decimal",
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(Math.abs(numericAmount)));
+            return joinMobileCurrencyLabel(amountLabel, currency, numericAmount < 0);
         }
 
-        const sign = numericAmount < 0 ? "-" : "";
-        const symbol = currencySymbols[currency] || `${currency} `;
         const compactValue = trimCompactCalendarDecimals((Math.abs(numericAmount) / 1000).toFixed(2));
-        return `${sign}${symbol}${compactValue}k`;
+        return joinMobileCurrencyLabel(`${compactValue}k`, currency, numericAmount < 0);
     }
 
     function buildInitialPreferences() {
@@ -1075,9 +1103,6 @@ if (appNode) {
         resetImagePreview();
         seedExecutedAt();
         openModal(tradeModal);
-        window.setTimeout(() => {
-            symbolInput.focus();
-        }, 40);
     }
 
     function closeTradeModal() {
@@ -2366,9 +2391,6 @@ if (appNode) {
         closeDetailModal();
         fillTradeForm(trade);
         openModal(tradeModal);
-        window.setTimeout(() => {
-            symbolInput.focus();
-        }, 40);
     }
 
     async function handleTradeSubmit(event) {

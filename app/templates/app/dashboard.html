@@ -640,5 +640,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-    <script src="{% static 'app/dashboard.js' %}" defer></script>
+    <script src="{% static 'app/dashboard.js' %}?v={{ app_static_version }}" defer></script>
 {% endblock %}

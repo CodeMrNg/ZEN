@@ -12,12 +12,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'app/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'app/dashboard.css' %}?v={{ app_static_version }}">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}" data-ui-locale="{{ app_language_locale }}">
     {% block content %}{% endblock %}
-    <script src="{% static 'app/ui.js' %}" defer></script>
+    <script src="{% static 'app/ui.js' %}?v={{ app_static_version }}" defer></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

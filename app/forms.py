@@ -1,3 +1,4 @@
+import calendar
 from decimal import Decimal
 
 from django import forms
@@ -363,6 +364,7 @@ class TradingPreferenceForm(forms.ModelForm):
             'default_fees',
             'default_confidence',
             'default_dashboard_year',
+            'default_week_start_day',
             'capital_base',
             'currency',
         )
@@ -374,6 +376,7 @@ class TradingPreferenceForm(forms.ModelForm):
             'default_fees': 'G/P par defaut',
             'default_confidence': 'Confiance par defaut',
             'default_dashboard_year': 'Annee dashboard par defaut',
+            'default_week_start_day': 'Premier jour de la semaine',
             'capital_base': 'Capital initial du compte actif',
             'currency': 'Devise du compte actif',
         }
@@ -404,6 +407,7 @@ class TradingPreferenceForm(forms.ModelForm):
         self.fields['default_fees'].label = tr(self.language, 'form.preferences.default_gp', 'G/P par defaut')
         self.fields['default_confidence'].label = tr(self.language, 'form.preferences.default_confidence', 'Confiance par defaut')
         self.fields['default_dashboard_year'].label = tr(self.language, 'form.preferences.default_dashboard_year', 'Annee dashboard par defaut')
+        self.fields['default_week_start_day'].label = tr(self.language, 'form.preferences.default_week_start_day', 'Premier jour de la semaine')
         self.fields['capital_base'].label = tr(self.language, 'form.preferences.active_initial_capital', 'Capital initial du compte actif')
         self.fields['currency'].label = tr(self.language, 'form.preferences.active_currency', 'Devise du compte actif')
         apply_choice_labels(
@@ -422,6 +426,18 @@ class TradingPreferenceForm(forms.ModelForm):
                 'CHF': tr(self.language, 'currency.chf', 'Franc suisse (CHF)'),
                 'XAF': tr(self.language, 'currency.xaf', 'Franc CFA BEAC (XAF)'),
                 'XOF': tr(self.language, 'currency.xof', 'Franc CFA BCEAO (XOF)'),
+            },
+        )
+        apply_choice_labels(
+            self.fields['default_week_start_day'],
+            {
+                calendar.MONDAY: tr(self.language, 'weekday.monday', 'Lundi'),
+                calendar.TUESDAY: tr(self.language, 'weekday.tuesday', 'Mardi'),
+                calendar.WEDNESDAY: tr(self.language, 'weekday.wednesday', 'Mercredi'),
+                calendar.THURSDAY: tr(self.language, 'weekday.thursday', 'Jeudi'),
+                calendar.FRIDAY: tr(self.language, 'weekday.friday', 'Vendredi'),
+                calendar.SATURDAY: tr(self.language, 'weekday.saturday', 'Samedi'),
+                calendar.SUNDAY: tr(self.language, 'weekday.sunday', 'Dimanche'),
             },
         )
         apply_choice_labels(

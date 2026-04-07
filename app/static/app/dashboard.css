@@ -3531,7 +3531,7 @@ button {
 
 .history-table {
     width: 100%;
-    min-width: 1060px;
+    min-width: 1180px;
     border-collapse: collapse;
 }
 
@@ -3563,6 +3563,38 @@ button {
     display: block;
     color: var(--text);
     font-size: 1rem;
+}
+
+.history-col-month {
+    min-width: 148px;
+}
+
+.history-col-money,
+.history-col-net {
+    white-space: nowrap;
+}
+
+.history-table th.history-col-money,
+.history-table th.history-col-net,
+.history-table td.history-col-money,
+.history-table td.history-col-net {
+    text-align: right;
+}
+
+.history-col-progress {
+    min-width: 132px;
+    white-space: nowrap;
+}
+
+.history-col-count {
+    min-width: 74px;
+}
+
+.history-table th.history-col-progress,
+.history-table td.history-col-progress,
+.history-table th.history-col-count,
+.history-table td.history-col-count {
+    text-align: center;
 }
 
 .history-badge {

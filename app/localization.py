@@ -1,3 +1,5 @@
+import calendar
+
 from django.utils.translation import get_language
 
 from .translation_providers import translate_with_provider
@@ -158,6 +160,7 @@ TRANSLATIONS = {
     "transactions.history.deposits": pack("Depots", "Deposits", "Depositos", "Depositos"),
     "transactions.history.withdrawals": pack("Retraits", "Withdrawals", "Retiros", "Retiradas"),
     "transactions.history.net": pack("Net", "Net", "Neto", "Liquido"),
+    "transactions.history.progress": pack("Progression (%)", "Progress (%)", "Progresion (%)", "Progresso (%)"),
     "transactions.history.trades": pack("Trades", "Trades", "Trades", "Trades"),
     "transactions.history.winners": pack("Gagnants", "Winners", "Ganadores", "Vencedores"),
     "transactions.history.losers": pack("Perdants", "Losers", "Perdedores", "Perdedores"),
@@ -337,6 +340,7 @@ TRANSLATIONS = {
     "settings.section.initial_gp": pack("G/P sur capital initial", "P/L on initial capital", "G/P sobre capital inicial", "G/P sobre capital inicial"),
     "settings.section.capital_hint": pack("Exemple : avec 1 % de risque et un capital initial de 10 000, l exposition de reference est de 100 dans la devise du compte.", "Example: with 1% risk and an initial capital of 10,000, the reference exposure is 100 in the account currency.", "Ejemplo: con un 1 % de riesgo y un capital inicial de 10 000, la exposicion de referencia es 100 en la moneda de la cuenta.", "Exemplo: com 1% de risco e capital inicial de 10.000, a exposicao de referencia e 100 na moeda da conta."),
     "settings.section.default_year_help": pack("L annee courante reste disponible par defaut. Les annees precedentes apparaissent seulement si le compte actif contient deja des trades sur ces periodes.", "The current year stays available by default. Previous years only appear when the active account already contains trades for those periods.", "El ano actual sigue disponible por defecto. Los anos anteriores solo aparecen si la cuenta activa ya contiene trades en esos periodos.", "O ano atual permanece disponivel por padrao. Os anos anteriores so aparecem se a conta ativa ja tiver trades nesses periodos."),
+    "settings.section.week_start_help": pack("Definit l ordre des jours dans le calendrier du dashboard et les vues detaillees.", "Defines the day order in the dashboard calendar and detailed views.", "Define el orden de los dias en el calendario del panel y las vistas detalladas.", "Define a ordem dos dias no calendario do dashboard e nas vistas detalhadas."),
     "settings.section.defaults_caption": pack("Les prochaines saisies utiliseront cette configuration par defaut.", "Future entries will use this default configuration.", "Las proximas entradas usaran esta configuracion por defecto.", "Os proximos registros usarao esta configuracao padrao."),
     "settings.section.save": pack("Enregistrer les parametres", "Save settings", "Guardar configuracion", "Salvar configuracoes"),
     "settings.section.save_loading": pack("Enregistrement...", "Saving...", "Guardando...", "Salvando..."),
@@ -346,6 +350,7 @@ TRANSLATIONS = {
     "settings.section.default_lots": pack("Lots par defaut", "Default lots", "Lotes por defecto", "Lotes padrao"),
     "settings.section.default_gp": pack("G/P par defaut", "Default P/L", "G/P por defecto", "G/P padrao"),
     "settings.section.default_confidence": pack("Confiance par defaut", "Default confidence", "Confianza por defecto", "Confianca padrao"),
+    "settings.section.default_week_start_day": pack("Semaine commence le", "Week starts on", "La semana empieza el", "A semana comeca em"),
     "settings.section.effects": pack("Effets de configuration", "Configuration effects", "Efectos de configuracion", "Efeitos de configuracao"),
     "settings.section.effects_copy_one": pack("Les champs preconfigures sont injectes dans la modale Nouveau trade pour accelerer la saisie et uniformiser les enregistrements.", "Preconfigured fields are injected into the New trade modal to speed up entry and standardize records.", "Los campos preconfigurados se inyectan en la modal Nuevo trade para acelerar el registro y estandarizar los datos.", "Os campos preconfigurados sao injetados na modal Novo trade para acelerar o registro e padronizar os dados."),
     "settings.section.effects_copy_two": pack("Le capital actuel reflete l etat du compte en temps reel. Le capital initial reste disponible pour mesurer la performance depuis l origine.", "Current capital reflects the live account state. Initial capital remains available to measure performance from inception.", "El capital actual refleja el estado de la cuenta en tiempo real. El capital inicial sigue disponible para medir el rendimiento desde el origen.", "O capital atual reflete o estado da conta em tempo real. O capital inicial permanece disponivel para medir a performance desde o inicio."),
@@ -408,8 +413,16 @@ TRANSLATIONS = {
     "form.preferences.default_gp": pack("G/P par defaut", "Default P/L", "G/P por defecto", "G/P padrao"),
     "form.preferences.default_confidence": pack("Confiance par defaut", "Default confidence", "Confianza por defecto", "Confianca padrao"),
     "form.preferences.default_dashboard_year": pack("Annee dashboard par defaut", "Default dashboard year", "Ano de dashboard por defecto", "Ano padrao do dashboard"),
+    "form.preferences.default_week_start_day": pack("Premier jour de la semaine", "First day of the week", "Primer dia de la semana", "Primeiro dia da semana"),
     "form.preferences.active_initial_capital": pack("Capital initial du compte actif", "Initial capital of the active account", "Capital inicial de la cuenta activa", "Capital inicial da conta ativa"),
     "form.preferences.active_currency": pack("Devise du compte actif", "Active account currency", "Moneda de la cuenta activa", "Moeda da conta ativa"),
+    "weekday.monday": pack("Lundi", "Monday", "Lunes", "Segunda-feira"),
+    "weekday.tuesday": pack("Mardi", "Tuesday", "Martes", "Terca-feira"),
+    "weekday.wednesday": pack("Mercredi", "Wednesday", "Miercoles", "Quarta-feira"),
+    "weekday.thursday": pack("Jeudi", "Thursday", "Jueves", "Quinta-feira"),
+    "weekday.friday": pack("Vendredi", "Friday", "Viernes", "Sexta-feira"),
+    "weekday.saturday": pack("Samedi", "Saturday", "Sabado", "Sabado"),
+    "weekday.sunday": pack("Dimanche", "Sunday", "Domingo", "Domingo"),
     "form.account.name": pack("Nom du compte", "Account name", "Nombre de la cuenta", "Nome da conta"),
     "form.account.broker": pack("Broker", "Broker", "Broker", "Broker"),
     "form.account.identifier": pack("Numero / identifiant", "Number / identifier", "Numero / identificador", "Numero / identificador"),
@@ -515,3 +528,18 @@ def translate(key, language=None, default=None, **kwargs):
 def get_weekday_short_labels(language=None):
     code = normalize_language(language or get_current_language_code())
     return WEEKDAY_SHORT.get(code, WEEKDAY_SHORT[DEFAULT_LANGUAGE])
+
+
+def normalize_week_start_day(value, default=calendar.SUNDAY):
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        normalized = default
+
+    return normalized if normalized in range(7) else default
+
+
+def get_rotated_weekday_short_labels(language=None, firstweekday=calendar.SUNDAY):
+    labels = list(get_weekday_short_labels(language))
+    start_index = normalize_week_start_day(firstweekday)
+    return labels[start_index:] + labels[:start_index]

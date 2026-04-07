@@ -169,5 +169,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-    <script src="{% static 'app/auth.js' %}" defer></script>
+    <script src="{% static 'app/auth.js' %}?v={{ app_static_version }}" defer></script>
 {% endblock %}

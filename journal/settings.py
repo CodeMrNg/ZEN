@@ -231,6 +231,7 @@ USE_TZ = True
 
 STATIC_URL = env("STATIC_URL", "/static/") or "/static/"
 STATIC_ROOT = env_path("STATIC_ROOT", "staticfiles")
+APP_STATIC_VERSION = env("APP_STATIC_VERSION", "20260407-1") or "20260407-1"
 MEDIA_URL = env("MEDIA_URL", "/media/") or "/media/"
 MEDIA_ROOT = env_path("MEDIA_ROOT", "media")
 

@@ -309,6 +309,17 @@
                             </div>
 
                             <div class="field-group">
+                                <label for="{{ preferences_form.default_week_start_day.id_for_label }}">{{ preferences_form.default_week_start_day.label }}</label>
+                                {{ preferences_form.default_week_start_day }}
+                                <small class="field-help">
+                                    {% tr 'settings.section.week_start_help' 'Definit l ordre des jours dans le calendrier du dashboard et les vues detaillees.' %}
+                                </small>
+                                {% for error in preferences_form.default_week_start_day.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
                                 <label for="{{ preferences_form.currency.id_for_label }}">{{ preferences_form.currency.label }}</label>
                                 {{ preferences_form.currency }}
                                 {% for error in preferences_form.currency.errors %}

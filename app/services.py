@@ -2,16 +2,22 @@ import calendar
 import random
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from statistics import pstdev
+from threading import Lock
 
 from django.contrib.auth import get_user_model
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from .formatting import format_decimal_compact
-from .localization import normalize_language, translate
+from .localization import (
+    get_rotated_weekday_short_labels,
+    normalize_language,
+    normalize_week_start_day,
+    translate,
+)
 from .models import (
     CURRENCY_SYMBOLS,
     CapitalMovement,
@@ -82,6 +88,54 @@ MONTH_LABELS = {
 }
 
 
+SQLITE_DECIMAL_REPAIR_SPECS = (
+    (
+        'app_trade',
+        'id',
+        {
+            'entry_price': Decimal('0.0001'),
+            'rr_ratio': None,
+            'exit_price': Decimal('0.0001'),
+            'quantity': Decimal('0.01'),
+            'lot_size': None,
+            'gp_value': None,
+            'fees': Decimal('0.00'),
+            'risk_amount': None,
+            'risk_percent': None,
+            'capital_base': Decimal('10000.00'),
+        },
+    ),
+    (
+        'app_tradingpreference',
+        'id',
+        {
+            'default_lot_size': Decimal('1.00'),
+            'default_risk_percent': Decimal('1.00'),
+            'default_fees': Decimal('0.00'),
+            'capital_base': Decimal('10000.00'),
+        },
+    ),
+    (
+        'app_tradingaccount',
+        'id',
+        {
+            'capital_base': Decimal('10000.00'),
+        },
+    ),
+    (
+        'app_capitalmovement',
+        'id',
+        {
+            'amount': Decimal('0.01'),
+        },
+    ),
+)
+
+_sqlite_decimal_repair_lock = Lock()
+_sqlite_decimal_repair_complete = False
+_NO_SQLITE_DECIMAL_UPDATE = object()
+
+
 def tr(key, language=None, default=None, **kwargs):
     return translate(key, language=normalize_language(language), default=default, **kwargs)
 
@@ -138,6 +192,65 @@ def get_month_start(value):
 
 def clamp(value, minimum=0, maximum=100):
     return max(minimum, min(maximum, value))
+
+
+def _normalize_sqlite_decimal_replacement(value, fallback):
+    if value is None:
+        return _NO_SQLITE_DECIMAL_UPDATE
+
+    raw_value = value.decode('utf-8', errors='ignore') if isinstance(value, bytes) else str(value)
+    raw_value = raw_value.strip()
+    if not raw_value:
+        return fallback
+
+    try:
+        parsed = Decimal(raw_value)
+    except (InvalidOperation, TypeError, ValueError):
+        return fallback
+
+    if not parsed.is_finite():
+        return fallback
+
+    return _NO_SQLITE_DECIMAL_UPDATE
+
+
+def ensure_sqlite_decimal_storage_integrity():
+    global _sqlite_decimal_repair_complete
+
+    if _sqlite_decimal_repair_complete or connection.vendor != 'sqlite':
+        return
+
+    with _sqlite_decimal_repair_lock:
+        if _sqlite_decimal_repair_complete or connection.vendor != 'sqlite':
+            return
+
+        existing_tables = set(connection.introspection.table_names())
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                for table_name, pk_column, field_defaults in SQLITE_DECIMAL_REPAIR_SPECS:
+                    if table_name not in existing_tables:
+                        continue
+
+                    for field_name, fallback in field_defaults.items():
+                        cursor.execute(
+                            f'SELECT {pk_column}, {field_name} FROM {table_name}'
+                        )
+                        pending_updates = []
+                        for row_id, raw_value in cursor.fetchall():
+                            replacement = _normalize_sqlite_decimal_replacement(raw_value, fallback)
+                            if replacement is _NO_SQLITE_DECIMAL_UPDATE:
+                                continue
+                            pending_updates.append(
+                                (None if replacement is None else str(replacement), row_id)
+                            )
+
+                        if pending_updates:
+                            cursor.executemany(
+                                f'UPDATE {table_name} SET {field_name} = %s WHERE {pk_column} = %s',
+                                pending_updates,
+                            )
+
+        _sqlite_decimal_repair_complete = True
 
 
 def format_month_label(year, month, language=None):
@@ -205,6 +318,7 @@ def compute_drawdown(cumulative_values):
 
 
 def get_or_create_preferences_for_user(user_id):
+    ensure_sqlite_decimal_storage_integrity()
     preferences, _ = TradingPreference.objects.get_or_create(user_id=user_id)
     return preferences
 
@@ -470,6 +584,7 @@ def serialize_preferences(preferences, current_capital=None, account=None, langu
         'default_fees': format_decimal_compact(preferences.default_fees),
         'default_confidence': preferences.default_confidence,
         'default_dashboard_year': str(preferences.default_dashboard_year),
+        'default_week_start_day': str(normalize_week_start_day(getattr(preferences, 'default_week_start_day', calendar.SUNDAY))),
         'capital_base': format_decimal_compact(capital_base),
         'capital_base_formatted': format_currency(capital_base, currency),
         'current_capital': format_decimal_compact(current_capital),
@@ -650,8 +765,9 @@ def serialize_trade(trade, currency='USD', language=None):
     }
 
 
-def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_day, currency='USD', language=None):
-    month_calendar = calendar.Calendar(firstweekday=0).monthdatescalendar(year, month)
+def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_day, currency='USD', language=None, firstweekday=calendar.SUNDAY):
+    firstweekday = normalize_week_start_day(firstweekday)
+    month_calendar = calendar.Calendar(firstweekday=firstweekday).monthdatescalendar(year, month)
     rows = []
     week_summaries = []
 
@@ -689,6 +805,8 @@ def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_da
 
     return {
         'label': format_month_label(year, month, language),
+        'weekday_labels': get_rotated_weekday_short_labels(language, firstweekday=firstweekday),
+        'week_start_day': firstweekday,
         'rows': rows,
         'week_summaries': week_summaries,
         'trade_map': {
@@ -702,6 +820,7 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, lan
     language = normalize_language(language)
     preferences = get_or_create_preferences_for_user(user_id)
     active_account = get_or_create_active_account_for_user(user_id, preferences)
+    week_start_day = normalize_week_start_day(getattr(preferences, 'default_week_start_day', calendar.SUNDAY))
     currency = active_account.currency
     trades = list(
         filter_queryset_for_account(
@@ -970,7 +1089,16 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, lan
                 'cumulative': cumulative_values,
             },
         },
-        'calendar': build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_day, currency, language=language),
+        'calendar': build_calendar_payload(
+            year,
+            month,
+            daily_totals,
+            daily_counts,
+            trades_by_day,
+            currency,
+            language=language,
+            firstweekday=week_start_day,
+        ),
         'recent_trades': recent_trades,
         'monthly_trades': monthly_trades,
         'preferences': serialize_preferences(preferences, current_capital=current_capital, account=active_account, language=language),
@@ -1128,8 +1256,24 @@ def build_transactions_payload_for_user(user_id, language=None):
     def resolve_month_net(month_data):
         return month_data['gp_total'] + month_data['deposits'] - month_data['withdrawals']
 
+    def resolve_month_progress_percent(month_data):
+        capital_start = month_data.get('capital_start')
+        if not capital_start:
+            return None
+
+        month_net = resolve_month_net(month_data)
+        return (month_net / capital_start * Decimal('100')).quantize(Decimal('0.01'))
+
     best_month = max(comparable_months, key=resolve_month_net) if comparable_months else None
-    worst_month = min(comparable_months, key=resolve_month_net) if len(comparable_months) > 1 else None
+    completed_comparable_months = [
+        item for item in comparable_months
+        if item['month_start'] != current_month_start
+    ]
+    completed_loss_months = [
+        item for item in completed_comparable_months
+        if resolve_month_net(item) < 0
+    ]
+    worst_month = min(completed_loss_months, key=resolve_month_net) if completed_loss_months else None
 
     running_capital = active_account.capital_base
     for month_data in sorted(monthly.values(), key=lambda item: item['month_start']):
@@ -1139,6 +1283,7 @@ def build_transactions_payload_for_user(user_id, language=None):
     monthly_history = []
     for month_data in sorted_months_desc:
         month_net = month_data['gp_total'] + month_data['deposits'] - month_data['withdrawals']
+        progress_percent = resolve_month_progress_percent(month_data)
         monthly_history.append(
             {
                 'month_key': month_data['month_start'].strftime('%Y-%m'),
@@ -1153,6 +1298,8 @@ def build_transactions_payload_for_user(user_id, language=None):
                 'winners': month_data['winners'],
                 'losers': month_data['losers'],
                 'net_label': format_currency(month_net, currency),
+                'progress_label': '--' if progress_percent is None else format_signed_percent(progress_percent),
+                'progress_tone': 'profit' if progress_percent and progress_percent > 0 else 'loss' if progress_percent and progress_percent < 0 else 'flat',
                 'tone': 'profit' if month_net > 0 else 'loss' if month_net < 0 else 'flat',
                 'is_best_month': bool(best_month and month_data['month_start'] == best_month['month_start']),
                 'is_worst_month': bool(worst_month and month_data['month_start'] == worst_month['month_start']),

@@ -360,7 +360,7 @@ if (transactionsAppNode) {
         if (!rows.length) {
             historyTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9">
+                    <td colspan="10">
                         <div class="empty-state">${strings.noMonthlyData}</div>
                     </td>
                 </tr>
@@ -375,20 +375,23 @@ if (transactionsAppNode) {
             ].filter(Boolean).join("");
             return `
                 <tr>
-                    <td>
+                    <td class="history-col-month">
                         <strong>${escapeHtml(row.month_label)}</strong>
                         ${badges}
                     </td>
-                    <td>${escapeHtml(row.capital_start_label)}</td>
-                    <td>${escapeHtml(row.gp_total_label)}</td>
-                    <td>${escapeHtml(row.deposits_label)}</td>
-                    <td>${escapeHtml(row.withdrawals_label)}</td>
-                    <td>
+                    <td class="history-col-money">${escapeHtml(row.capital_start_label)}</td>
+                    <td class="history-col-money">${escapeHtml(row.gp_total_label)}</td>
+                    <td class="history-col-money">${escapeHtml(row.deposits_label)}</td>
+                    <td class="history-col-money">${escapeHtml(row.withdrawals_label)}</td>
+                    <td class="history-col-net">
                         <span class="history-tone ${escapeHtml(row.tone)}">${escapeHtml(row.net_label)}</span>
                     </td>
-                    <td>${escapeHtml(row.trade_count)}</td>
-                    <td>${escapeHtml(row.winners)}</td>
-                    <td>${escapeHtml(row.losers)}</td>
+                    <td class="history-col-progress">
+                        <span class="history-tone ${escapeHtml(row.progress_tone)}">${escapeHtml(row.progress_label)}</span>
+                    </td>
+                    <td class="history-col-count">${escapeHtml(row.trade_count)}</td>
+                    <td class="history-col-count">${escapeHtml(row.winners)}</td>
+                    <td class="history-col-count">${escapeHtml(row.losers)}</td>
                 </tr>
             `;
         }).join("");

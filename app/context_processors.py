@@ -1,4 +1,5 @@
 import calendar
+from decimal import InvalidOperation
 
 from django.conf import settings
 from django.db.utils import OperationalError, ProgrammingError
@@ -12,6 +13,7 @@ from .localization import (
     normalize_week_start_day,
 )
 from .models import SocialLink, TradingPreference
+from .services import ensure_sqlite_decimal_storage_integrity
 
 
 def app_i18n(request):
@@ -20,10 +22,11 @@ def app_i18n(request):
 
     if getattr(getattr(request, "user", None), "is_authenticated", False):
         try:
+            ensure_sqlite_decimal_storage_integrity(user_id=request.user.pk)
             week_start_day = normalize_week_start_day(
                 getattr(request.user.trading_preferences, "default_week_start_day", week_start_day)
             )
-        except (TradingPreference.DoesNotExist, OperationalError, ProgrammingError):
+        except (TradingPreference.DoesNotExist, OperationalError, ProgrammingError, InvalidOperation):
             week_start_day = calendar.SUNDAY
 
     try:

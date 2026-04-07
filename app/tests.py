@@ -195,7 +195,26 @@ class TradingJournalApiTests(TestCase):
                 ['', '', trade.id],
             )
 
-        services._sqlite_decimal_repair_complete = False
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        trade.refresh_from_db()
+        self.assertIsNone(trade.rr_ratio)
+        self.assertIsNone(trade.gp_value)
+
+    def test_dashboard_view_repairs_new_invalid_sqlite_decimal_after_prior_request(self):
+        if connection.vendor != 'sqlite':
+            self.skipTest('SQLite-specific regression.')
+
+        trade = self.create_trade()
+        warmup_response = self.client.get(reverse('app:dashboard'))
+        self.assertEqual(warmup_response.status_code, 200)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'UPDATE app_trade SET rr_ratio = %s, gp_value = %s WHERE id = %s',
+                ['', '', trade.id],
+            )
 
         response = self.client.get(reverse('app:dashboard'))
 

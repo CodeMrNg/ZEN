@@ -92,6 +92,7 @@ SQLITE_DECIMAL_REPAIR_SPECS = (
     (
         'app_trade',
         'id',
+        'user_id',
         {
             'entry_price': Decimal('0.0001'),
             'rr_ratio': None,
@@ -108,6 +109,7 @@ SQLITE_DECIMAL_REPAIR_SPECS = (
     (
         'app_tradingpreference',
         'id',
+        'user_id',
         {
             'default_lot_size': Decimal('1.00'),
             'default_risk_percent': Decimal('1.00'),
@@ -118,6 +120,7 @@ SQLITE_DECIMAL_REPAIR_SPECS = (
     (
         'app_tradingaccount',
         'id',
+        'user_id',
         {
             'capital_base': Decimal('10000.00'),
         },
@@ -125,6 +128,7 @@ SQLITE_DECIMAL_REPAIR_SPECS = (
     (
         'app_capitalmovement',
         'id',
+        'user_id',
         {
             'amount': Decimal('0.01'),
         },
@@ -132,7 +136,6 @@ SQLITE_DECIMAL_REPAIR_SPECS = (
 )
 
 _sqlite_decimal_repair_lock = Lock()
-_sqlite_decimal_repair_complete = False
 _NO_SQLITE_DECIMAL_UPDATE = object()
 
 
@@ -214,27 +217,29 @@ def _normalize_sqlite_decimal_replacement(value, fallback):
     return _NO_SQLITE_DECIMAL_UPDATE
 
 
-def ensure_sqlite_decimal_storage_integrity():
-    global _sqlite_decimal_repair_complete
-
-    if _sqlite_decimal_repair_complete or connection.vendor != 'sqlite':
+def ensure_sqlite_decimal_storage_integrity(user_id=None):
+    if connection.vendor != 'sqlite':
         return
 
     with _sqlite_decimal_repair_lock:
-        if _sqlite_decimal_repair_complete or connection.vendor != 'sqlite':
+        if connection.vendor != 'sqlite':
             return
 
         existing_tables = set(connection.introspection.table_names())
         with transaction.atomic():
             with connection.cursor() as cursor:
-                for table_name, pk_column, field_defaults in SQLITE_DECIMAL_REPAIR_SPECS:
+                for table_name, pk_column, user_column, field_defaults in SQLITE_DECIMAL_REPAIR_SPECS:
                     if table_name not in existing_tables:
                         continue
 
                     for field_name, fallback in field_defaults.items():
-                        cursor.execute(
-                            f'SELECT {pk_column}, {field_name} FROM {table_name}'
-                        )
+                        query = f'SELECT {pk_column}, {field_name} FROM {table_name}'
+                        params = []
+                        if user_id is not None and user_column:
+                            query += f' WHERE {user_column} = %s'
+                            params.append(user_id)
+
+                        cursor.execute(query, params)
                         pending_updates = []
                         for row_id, raw_value in cursor.fetchall():
                             replacement = _normalize_sqlite_decimal_replacement(raw_value, fallback)
@@ -249,8 +254,6 @@ def ensure_sqlite_decimal_storage_integrity():
                                 f'UPDATE {table_name} SET {field_name} = %s WHERE {pk_column} = %s',
                                 pending_updates,
                             )
-
-        _sqlite_decimal_repair_complete = True
 
 
 def format_month_label(year, month, language=None):
@@ -318,7 +321,7 @@ def compute_drawdown(cumulative_values):
 
 
 def get_or_create_preferences_for_user(user_id):
-    ensure_sqlite_decimal_storage_integrity()
+    ensure_sqlite_decimal_storage_integrity(user_id=user_id)
     preferences, _ = TradingPreference.objects.get_or_create(user_id=user_id)
     return preferences
 

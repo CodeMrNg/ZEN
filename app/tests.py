@@ -3,12 +3,13 @@ import re
 import shutil
 import tempfile
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
+from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -222,6 +223,20 @@ class TradingJournalApiTests(TestCase):
         trade.refresh_from_db()
         self.assertIsNone(trade.rr_ratio)
         self.assertIsNone(trade.gp_value)
+
+    @patch("app.views.ensure_sqlite_decimal_storage_integrity")
+    @patch("app.views.render")
+    def test_dashboard_view_retries_once_after_invalid_operation(self, mock_render, mock_repair):
+        mock_render.side_effect = [
+            InvalidOperation(),
+            HttpResponse("ok"),
+        ]
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_render.call_count, 2)
+        mock_repair.assert_called_once_with()
 
     def test_dashboard_api_limits_recent_trades_to_five_and_exposes_full_month_list(self):
         account = self.get_active_account()

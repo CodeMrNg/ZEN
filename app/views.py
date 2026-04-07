@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -41,6 +41,7 @@ from .services import (
     get_or_create_active_account_for_user,
     get_current_capital_for_user,
     get_or_create_preferences_for_user,
+    ensure_sqlite_decimal_storage_integrity,
     mark_server_refresh_updated,
     get_archived_trading_accounts_for_user,
     get_trading_accounts_for_user,
@@ -184,20 +185,27 @@ def logout_view(request):
 
 
 @login_required
-def dashboard_view(request):
+def _build_dashboard_view_context(request):
     preferences = get_or_create_preferences_for_user(request.user.pk)
     active_account = get_or_create_active_account_for_user(request.user.pk, preferences)
-    return render(
-        request,
-        'app/dashboard.html',
-        {
-            'trade_preferences': preferences,
-            'trade_current_capital': get_current_capital_for_user(request.user.pk, preferences, account=active_account),
-            'active_account': active_account,
-            'trading_accounts': get_trading_accounts_for_user(request.user.pk),
-            'server_refresh': build_server_refresh_snapshot(language=getattr(request, 'LANGUAGE_CODE', None)) if request.user.is_superuser else None,
-        },
-    )
+    return {
+        'trade_preferences': preferences,
+        'trade_current_capital': get_current_capital_for_user(request.user.pk, preferences, account=active_account),
+        'active_account': active_account,
+        'trading_accounts': get_trading_accounts_for_user(request.user.pk),
+        'server_refresh': build_server_refresh_snapshot(language=getattr(request, 'LANGUAGE_CODE', None)) if request.user.is_superuser else None,
+    }
+
+
+@login_required
+def dashboard_view(request):
+    try:
+        return render(request, 'app/dashboard.html', _build_dashboard_view_context(request))
+    except InvalidOperation:
+        # Retry once after a full SQLite decimal cleanup in case stale malformed rows
+        # slipped past the targeted per-user repair path.
+        ensure_sqlite_decimal_storage_integrity()
+        return render(request, 'app/dashboard.html', _build_dashboard_view_context(request))
 
 
 @login_required

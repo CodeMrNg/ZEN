@@ -6,6 +6,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const openButtons = Array.from(document.querySelectorAll("[data-auth-modal-open]"));
     const closeButtons = Array.from(document.querySelectorAll("[data-auth-modal-close]"));
     const mobileQuery = window.matchMedia("(max-width: 860px)");
+    const visualViewport = window.visualViewport;
+
+    function syncAuthModalLayout() {
+        const viewportHeight = Math.round(
+            visualViewport?.height
+            || window.innerHeight
+            || document.documentElement.clientHeight
+            || 0
+        );
+
+        if (viewportHeight > 0) {
+            body.style.setProperty("--auth-viewport-height", `${viewportHeight}px`);
+        }
+
+        if (!(authCardPanel instanceof HTMLElement)) {
+            return;
+        }
+
+        if (!mobileQuery.matches || !body.classList.contains("auth-modal-open")) {
+            body.classList.remove("auth-modal-centered");
+            return;
+        }
+
+        const availableHeight = Math.max(viewportHeight - 32, 0);
+        const shouldCenter = authCardPanel.scrollHeight <= Math.max(availableHeight - 48, 0);
+        body.classList.toggle("auth-modal-centered", shouldCenter);
+    }
 
     function syncCloseButtonVisibility() {
         if (!(authCloseButton instanceof HTMLElement)) {
@@ -20,8 +47,10 @@ document.addEventListener("DOMContentLoaded", () => {
         body.classList.toggle("auth-mobile-ready", isMobile);
         if (!isMobile) {
             body.classList.remove("auth-modal-open");
+            body.classList.remove("auth-modal-centered");
         }
         syncCloseButtonVisibility();
+        syncAuthModalLayout();
     }
 
     function openAuthModal() {
@@ -30,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         body.classList.add("auth-modal-open");
         syncCloseButtonVisibility();
+        window.requestAnimationFrame(syncAuthModalLayout);
         const focusTarget = authCloseButton instanceof HTMLElement
             ? authCloseButton
             : authCardPanel;
@@ -43,6 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         body.classList.remove("auth-modal-open");
+        body.classList.remove("auth-modal-centered");
         syncCloseButtonVisibility();
     }
 
@@ -51,6 +82,11 @@ document.addEventListener("DOMContentLoaded", () => {
         mobileQuery.addEventListener("change", syncAuthModalMode);
     } else if (typeof mobileQuery.addListener === "function") {
         mobileQuery.addListener(syncAuthModalMode);
+    }
+    window.addEventListener("resize", syncAuthModalLayout);
+    if (visualViewport) {
+        visualViewport.addEventListener("resize", syncAuthModalLayout);
+        visualViewport.addEventListener("scroll", syncAuthModalLayout);
     }
 
     openButtons.forEach((button) => {
@@ -164,4 +200,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
     evaluatePassword();
     syncCloseButtonVisibility();
+    syncAuthModalLayout();
 });

@@ -4007,12 +4007,16 @@ button {
         inset: 0;
         z-index: 110;
         display: none;
-        align-items: stretch;
+        align-items: flex-start;
         justify-content: center;
         padding:
             calc(12px + env(safe-area-inset-top))
             16px
             calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .auth-body.auth-mobile-ready.auth-modal-centered .auth-panel {
+        align-items: center;
     }
 
     .auth-body.auth-mobile-ready.auth-modal-open {
@@ -4035,10 +4039,10 @@ button {
     .auth-card-panel {
         position: relative;
         z-index: 1;
-        margin-top: auto;
         width: min(720px, 100%);
         max-height: calc(100vh - 32px);
-        max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        max-height: calc(var(--auth-viewport-height, 100dvh) - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        min-height: 0;
         overflow: auto;
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
@@ -4385,7 +4389,7 @@ button {
 
     .auth-card-panel {
         max-height: calc(100vh - 20px);
-        max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        max-height: calc(var(--auth-viewport-height, 100dvh) - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
     }
 

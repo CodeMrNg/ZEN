@@ -819,6 +819,7 @@ def serialize_trade(trade, currency='USD', language=None):
 
 def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_day, currency='USD', language=None, firstweekday=calendar.SUNDAY):
     firstweekday = normalize_week_start_day(firstweekday)
+    today = timezone.localdate()
     month_calendar = calendar.Calendar(firstweekday=firstweekday).monthdatescalendar(year, month)
     rows = []
     week_summaries = []
@@ -837,6 +838,7 @@ def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_da
                 {
                     'iso': day.isoformat(),
                     'day': day.day,
+                    'is_today': day == today,
                     'in_month': day.month == month,
                     'pnl': pnl,
                     'pnl_formatted': format_currency(pnl, currency) if pnl else format_currency(0, currency),

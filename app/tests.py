@@ -2,7 +2,7 @@ import calendar
 import re
 import shutil
 import tempfile
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from unittest.mock import patch
 
@@ -458,6 +458,21 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(monday_payload['calendar']['week_start_day'], calendar.MONDAY)
         self.assertEqual(monday_payload['calendar']['weekday_labels'][0], 'Lun')
         self.assertEqual(monday_payload['calendar']['rows'][0][0]['iso'], '2026-03-30')
+
+    @patch("app.services.timezone.localdate")
+    def test_dashboard_api_marks_current_day_in_calendar_payload(self, mock_localdate):
+        mock_localdate.return_value = date(2026, 4, 7)
+
+        response = self.client.get(
+            reverse('app:dashboard-data'),
+            {'month': '2026-04', 'year': '2026'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()['calendar']['rows']
+        today_entries = [day for row in rows for day in row if day['is_today']]
+        self.assertEqual(len(today_entries), 1)
+        self.assertEqual(today_entries[0]['iso'], '2026-04-07')
 
     def test_settings_view_saves_default_dashboard_year_when_previous_year_exists(self):
         account = self.get_active_account()

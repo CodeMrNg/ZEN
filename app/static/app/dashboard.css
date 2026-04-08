@@ -9,6 +9,7 @@
     --muted: #8f9bb3;
     --muted-strong: #b8c1d6;
     --green: #c8f800;
+    --accent: var(--green);
     --red: #ef6464;
     --amber: #d9ff5c;
     --blue: #7ab8ff;
@@ -3021,6 +3022,20 @@ button {
     color: var(--muted-strong);
     font-size: 0.88rem;
     font-weight: 700;
+}
+
+.calendar-cell-day-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.calendar-cell-today-marker {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--accent);
+    flex: 0 0 auto;
 }
 
 .calendar-cell-trades {

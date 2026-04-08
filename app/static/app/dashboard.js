@@ -2026,6 +2026,7 @@ if (appNode) {
                 const toneClass = day.tone === "profit" ? "is-profit" : day.tone === "loss" ? "is-loss" : "";
                 const otherClass = day.in_month ? "" : "is-other";
                 const clickableClass = day.in_month && day.trade_count ? "is-clickable" : "";
+                const todayMarker = day.is_today ? '<span class="calendar-cell-today-marker" aria-hidden="true"></span>' : "";
                 const subtitle = day.trade_count ? `${day.trade_count} ${strings.dayTradeCountSuffix}` : strings.noExecution;
                 const pnlLabel = isMobileCalendarViewport()
                     ? formatMobileCalendarAmount(day.pnl)
@@ -2035,7 +2036,10 @@ if (appNode) {
                     return `
                         <button type="button" class="calendar-cell ${toneClass} ${otherClass} ${clickableClass}" data-calendar-date="${day.iso}">
                             <div class="calendar-cell-top">
-                                <span class="calendar-cell-day">${day.day}</span>
+                                <span class="calendar-cell-day-wrap">
+                                    <span class="calendar-cell-day">${day.day}</span>
+                                    ${todayMarker}
+                                </span>
                                 <span class="calendar-cell-trades">${day.trade_count || ""}</span>
                             </div>
                             <div>
@@ -2049,7 +2053,10 @@ if (appNode) {
                 return `
                     <article class="calendar-cell ${toneClass} ${otherClass}">
                         <div class="calendar-cell-top">
-                            <span class="calendar-cell-day">${day.day}</span>
+                            <span class="calendar-cell-day-wrap">
+                                <span class="calendar-cell-day">${day.day}</span>
+                                ${todayMarker}
+                            </span>
                             <span class="calendar-cell-trades">${day.trade_count || ""}</span>
                         </div>
                         <div>

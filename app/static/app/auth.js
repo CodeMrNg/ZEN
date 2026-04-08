@@ -8,6 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const mobileQuery = window.matchMedia("(max-width: 860px)");
     const visualViewport = window.visualViewport;
 
+    function getFirstAuthInput() {
+        return authPanel?.querySelector(
+            "input:not([type='hidden']):not([disabled]), textarea:not([disabled]), select:not([disabled])"
+        );
+    }
+
     function syncAuthModalLayout() {
         const viewportHeight = Math.round(
             visualViewport?.height
@@ -60,9 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body.classList.add("auth-modal-open");
         syncCloseButtonVisibility();
         window.requestAnimationFrame(syncAuthModalLayout);
-        const focusTarget = authCloseButton instanceof HTMLElement
-            ? authCloseButton
-            : authCardPanel;
+        const focusTarget = getFirstAuthInput() || authCloseButton || authCardPanel;
         if (focusTarget instanceof HTMLElement) {
             window.setTimeout(() => focusTarget.focus(), 40);
         }

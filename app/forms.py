@@ -100,6 +100,7 @@ class LoginForm(AuthenticationForm):
             attrs={
                 'placeholder': 'Ex: mikefx',
                 'autocomplete': 'username',
+                'autofocus': True,
             }
         ),
     )
@@ -138,6 +139,7 @@ class SignUpForm(UserCreationForm):
             attrs={
                 'placeholder': 'Identifiant de connexion',
                 'autocomplete': 'username',
+                'autofocus': True,
             }
         ),
     )

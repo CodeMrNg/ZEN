@@ -37,6 +37,15 @@ class DashboardAccessTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('app:login'), response.url)
 
+    def test_auth_pages_mark_first_input_for_autofocus(self):
+        login_response = self.client.get(reverse('app:login'))
+        register_response = self.client.get(reverse('app:register'))
+
+        self.assertEqual(login_response.status_code, 200)
+        self.assertEqual(register_response.status_code, 200)
+        self.assertContains(login_response, 'autofocus', html=False)
+        self.assertContains(register_response, 'autofocus', html=False)
+
 
 @override_settings(APP_TRANSLATION_PROVIDER="builtin")
 class ErrorPageViewTests(SimpleTestCase):

@@ -1,13 +1,18 @@
 import calendar
 import random
+from decimal import Context
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from statistics import pstdev
 from threading import Lock
 
+from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.core.exceptions import FieldDoesNotExist
+from django.core.validators import MinValueValidator
 from django.db import connection, models, transaction
+from django.db.models.fields import NOT_PROVIDED
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -88,55 +93,10 @@ MONTH_LABELS = {
 }
 
 
-SQLITE_DECIMAL_REPAIR_SPECS = (
-    (
-        'app_trade',
-        'id',
-        'user_id',
-        {
-            'entry_price': Decimal('0.0001'),
-            'rr_ratio': None,
-            'exit_price': Decimal('0.0001'),
-            'quantity': Decimal('0.01'),
-            'lot_size': None,
-            'gp_value': None,
-            'fees': Decimal('0.00'),
-            'risk_amount': None,
-            'risk_percent': None,
-            'capital_base': Decimal('10000.00'),
-        },
-    ),
-    (
-        'app_tradingpreference',
-        'id',
-        'user_id',
-        {
-            'default_lot_size': Decimal('1.00'),
-            'default_risk_percent': Decimal('1.00'),
-            'default_fees': Decimal('0.00'),
-            'capital_base': Decimal('10000.00'),
-        },
-    ),
-    (
-        'app_tradingaccount',
-        'id',
-        'user_id',
-        {
-            'capital_base': Decimal('10000.00'),
-        },
-    ),
-    (
-        'app_capitalmovement',
-        'id',
-        'user_id',
-        {
-            'amount': Decimal('0.01'),
-        },
-    ),
-)
-
 _sqlite_decimal_repair_lock = Lock()
 _NO_SQLITE_DECIMAL_UPDATE = object()
+_SQLITE_DECIMAL_CREATE_CONTEXT = Context(prec=15)
+_sqlite_decimal_repair_specs = None
 
 
 def tr(key, language=None, default=None, **kwargs):
@@ -197,9 +157,81 @@ def clamp(value, minimum=0, maximum=100):
     return max(minimum, min(maximum, value))
 
 
-def _normalize_sqlite_decimal_replacement(value, fallback):
+def _resolve_decimal_repair_fallback(field):
+    if field.null:
+        return None
+
+    if field.default is not NOT_PROVIDED:
+        default_value = field.get_default()
+        if default_value not in (None, ''):
+            return Decimal(str(default_value)).quantize(
+                Decimal(1).scaleb(-field.decimal_places),
+                context=field.context,
+            )
+
+    for validator in field.validators:
+        if isinstance(validator, MinValueValidator) and validator.limit_value is not None:
+            return Decimal(str(validator.limit_value)).quantize(
+                Decimal(1).scaleb(-field.decimal_places),
+                context=field.context,
+            )
+
+    return Decimal('0').quantize(
+        Decimal(1).scaleb(-field.decimal_places),
+        context=field.context,
+    )
+
+
+def _get_sqlite_decimal_repair_specs():
+    global _sqlite_decimal_repair_specs
+
+    if _sqlite_decimal_repair_specs is not None:
+        return _sqlite_decimal_repair_specs
+
+    repair_specs = []
+    for model in apps.get_app_config('app').get_models():
+        decimal_fields = []
+        for field in model._meta.local_fields:
+            if isinstance(field, models.DecimalField):
+                decimal_fields.append(
+                    {
+                        'field': field,
+                        'field_name': field.column,
+                        'quantize_value': Decimal(1).scaleb(-field.decimal_places),
+                        'fallback': _resolve_decimal_repair_fallback(field),
+                    }
+                )
+
+        if not decimal_fields:
+            continue
+
+        try:
+            user_column = model._meta.get_field('user').column
+        except FieldDoesNotExist:
+            user_column = None
+
+        repair_specs.append(
+            {
+                'model_label': model._meta.label,
+                'table_name': model._meta.db_table,
+                'pk_column': model._meta.pk.column,
+                'user_column': user_column,
+                'decimal_fields': decimal_fields,
+            }
+        )
+
+    _sqlite_decimal_repair_specs = tuple(repair_specs)
+    return _sqlite_decimal_repair_specs
+
+
+def _normalize_sqlite_decimal_replacement(value, field_spec):
+    field = field_spec['field']
+    fallback = field_spec['fallback']
+
     if value is None:
-        return _NO_SQLITE_DECIMAL_UPDATE
+        if field.null:
+            return _NO_SQLITE_DECIMAL_UPDATE
+        return fallback
 
     raw_value = value.decode('utf-8', errors='ignore') if isinstance(value, bytes) else str(value)
     raw_value = raw_value.strip()
@@ -207,32 +239,45 @@ def _normalize_sqlite_decimal_replacement(value, fallback):
         return fallback
 
     try:
-        parsed = Decimal(raw_value)
-    except (InvalidOperation, TypeError, ValueError):
+        normalized = _SQLITE_DECIMAL_CREATE_CONTEXT.create_decimal_from_float(float(raw_value)).quantize(
+            field_spec['quantize_value'],
+            context=field.context,
+        )
+    except (InvalidOperation, OverflowError, TypeError, ValueError):
         return fallback
 
-    if not parsed.is_finite():
+    if not normalized.is_finite():
         return fallback
 
-    return _NO_SQLITE_DECIMAL_UPDATE
+    normalized_label = f'{normalized:.{field.decimal_places}f}'
+    if raw_value == normalized_label:
+        return _NO_SQLITE_DECIMAL_UPDATE
+    return normalized
 
 
 def ensure_sqlite_decimal_storage_integrity(user_id=None):
     if connection.vendor != 'sqlite':
-        return
+        return {'updated_rows': 0, 'updated_fields': 0}
 
     with _sqlite_decimal_repair_lock:
         if connection.vendor != 'sqlite':
-            return
+            return {'updated_rows': 0, 'updated_fields': 0}
 
         existing_tables = set(connection.introspection.table_names())
+        updated_rows = 0
+        updated_fields = 0
         with transaction.atomic():
             with connection.cursor() as cursor:
-                for table_name, pk_column, user_column, field_defaults in SQLITE_DECIMAL_REPAIR_SPECS:
+                for repair_spec in _get_sqlite_decimal_repair_specs():
+                    table_name = repair_spec['table_name']
                     if table_name not in existing_tables:
                         continue
 
-                    for field_name, fallback in field_defaults.items():
+                    pk_column = repair_spec['pk_column']
+                    user_column = repair_spec['user_column']
+
+                    for field_spec in repair_spec['decimal_fields']:
+                        field_name = field_spec['field_name']
                         query = f'SELECT {pk_column}, {field_name} FROM {table_name}'
                         params = []
                         if user_id is not None and user_column:
@@ -242,7 +287,7 @@ def ensure_sqlite_decimal_storage_integrity(user_id=None):
                         cursor.execute(query, params)
                         pending_updates = []
                         for row_id, raw_value in cursor.fetchall():
-                            replacement = _normalize_sqlite_decimal_replacement(raw_value, fallback)
+                            replacement = _normalize_sqlite_decimal_replacement(raw_value, field_spec)
                             if replacement is _NO_SQLITE_DECIMAL_UPDATE:
                                 continue
                             pending_updates.append(
@@ -254,6 +299,10 @@ def ensure_sqlite_decimal_storage_integrity(user_id=None):
                                 f'UPDATE {table_name} SET {field_name} = %s WHERE {pk_column} = %s',
                                 pending_updates,
                             )
+                            updated_rows += len(pending_updates)
+                            updated_fields += 1
+
+        return {'updated_rows': updated_rows, 'updated_fields': updated_fields}
 
 
 def format_month_label(year, month, language=None):

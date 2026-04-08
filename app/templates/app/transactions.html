@@ -167,7 +167,7 @@
                         <span>{% tr 'transactions.panel.best_month' 'Meilleur mois' %}</span>
                         <strong id="transactions-highlight-best-month">--</strong>
                     </article>
-                    <article class="detail-card">
+                    <article class="detail-card detail-card-wide">
                         <span>{% tr 'transactions.panel.worst_month' 'Mauvais mois' %}</span>
                         <strong id="transactions-highlight-worst-month">--</strong>
                     </article>
@@ -212,7 +212,7 @@
 
     <div class="trade-modal" id="movement-modal" hidden aria-hidden="true">
         <div class="trade-modal-backdrop" data-close-movement-modal></div>
-        <section class="trade-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-modal-title">
+        <section class="trade-modal-dialog" id="movement-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-modal-title" tabindex="-1">
             <div class="trade-modal-header">
                 <div>
                     <p class="panel-kicker">{% tr 'transactions.modal.capital_flow' 'Flux de capital' %}</p>

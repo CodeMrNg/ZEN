@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import connection
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
@@ -224,6 +225,49 @@ class TradingJournalApiTests(TestCase):
         self.assertIsNone(trade.rr_ratio)
         self.assertIsNone(trade.gp_value)
 
+    def test_dashboard_view_repairs_non_quantizable_sqlite_decimal_storage(self):
+        if connection.vendor != 'sqlite':
+            self.skipTest('SQLite-specific regression.')
+
+        trade = self.create_trade()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'UPDATE app_trade SET rr_ratio = %s, gp_value = %s WHERE id = %s',
+                ['1e1000', '1e1000', trade.id],
+            )
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        trade.refresh_from_db()
+        self.assertIsNone(trade.rr_ratio)
+        self.assertIsNone(trade.gp_value)
+
+    def test_dashboard_view_repairs_invalid_account_and_preference_capital_base_storage(self):
+        if connection.vendor != 'sqlite':
+            self.skipTest('SQLite-specific regression.')
+
+        account = self.get_active_account()
+        preferences = TradingPreference.objects.get(user=self.user)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'UPDATE app_tradingaccount SET capital_base = %s WHERE id = %s',
+                ['1e1000', account.id],
+            )
+            cursor.execute(
+                'UPDATE app_tradingpreference SET capital_base = %s, default_lot_size = %s WHERE id = %s',
+                ['1e1000', '1e1000', preferences.id],
+            )
+
+        response = self.client.get(reverse('app:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        account.refresh_from_db()
+        preferences.refresh_from_db()
+        self.assertEqual(account.capital_base, Decimal('10000.00'))
+        self.assertEqual(preferences.capital_base, Decimal('10000.00'))
+        self.assertEqual(preferences.default_lot_size, Decimal('1.00'))
+
     @patch("app.views.ensure_sqlite_decimal_storage_integrity")
     @patch("app.views.render")
     def test_dashboard_view_retries_once_after_invalid_operation(self, mock_render, mock_repair):
@@ -237,6 +281,22 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_render.call_count, 2)
         mock_repair.assert_called_once_with()
+
+    def test_repair_sqlite_decimals_management_command_repairs_extreme_values(self):
+        if connection.vendor != 'sqlite':
+            self.skipTest('SQLite-specific regression.')
+
+        trade = self.create_trade()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'UPDATE app_trade SET gp_value = %s WHERE id = %s',
+                ['1e1000', trade.id],
+            )
+
+        call_command('repair_sqlite_decimals')
+
+        trade.refresh_from_db()
+        self.assertIsNone(trade.gp_value)
 
     def test_dashboard_api_limits_recent_trades_to_five_and_exposes_full_month_list(self):
         account = self.get_active_account()
@@ -1297,6 +1357,16 @@ class TradingJournalApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'autofocus', html=False)
+
+    def test_transactions_view_does_not_autofocus_movement_inputs(self):
+        self.get_active_account()
+
+        response = self.client.get(reverse('app:transactions'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'autofocus', html=False)
+        self.assertContains(response, 'id="movement-modal-dialog"', html=False)
+        self.assertContains(response, 'tabindex="-1"', html=False)
 
     def test_settings_view_changes_password(self):
         response = self.client.post(

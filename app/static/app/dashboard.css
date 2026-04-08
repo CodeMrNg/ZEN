@@ -1779,6 +1779,10 @@ button {
     grid-column: span 5;
 }
 
+.dashboard-grid-top .panel.transactions-panel-side {
+    grid-column: span 5;
+}
+
 .settings-panel-accounts {
     grid-column: span 12;
 }
@@ -3416,8 +3420,12 @@ button {
 
 .transaction-highlights {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+}
+
+.transaction-highlights > .detail-card-wide {
+    grid-column: 1 / -1;
 }
 
 .movement-list {

@@ -128,6 +128,7 @@ if (transactionsAppNode) {
     const movementModalTitle = document.getElementById("movement-modal-title");
     const movementModalCopy = document.getElementById("movement-modal-copy");
     const closeMovementModalButton = document.getElementById("close-movement-modal");
+    const movementModalDialog = document.getElementById("movement-modal-dialog");
     const movementForm = document.getElementById("movement-form");
     const movementKind = document.getElementById("movement-kind");
     const movementOccurredAt = document.getElementById("movement-occurred-at");
@@ -482,9 +483,9 @@ if (transactionsAppNode) {
         movementSubmitButton.textContent = isDeposit ? strings.recordDeposit : strings.recordWithdrawal;
         movementSubmitButton.className = isDeposit ? "warning-button" : "success-button";
         openModal(movementModal);
-        window.setTimeout(() => {
-            movementOccurredAt.focus();
-        }, 40);
+        window.requestAnimationFrame(() => {
+            movementModalDialog?.focus({ preventScroll: true });
+        });
     }
 
     function closeMovementModal() {

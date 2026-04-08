@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const body = document.body;
     const authPanel = document.querySelector(".auth-panel");
+    const authCardPanel = document.querySelector(".auth-card-panel");
     const authCloseButton = document.querySelector(".auth-panel-close");
     const openButtons = Array.from(document.querySelectorAll("[data-auth-modal-open]"));
     const closeButtons = Array.from(document.querySelectorAll("[data-auth-modal-close]"));
@@ -29,9 +30,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         body.classList.add("auth-modal-open");
         syncCloseButtonVisibility();
-        const firstField = authPanel.querySelector("input, button, textarea, select");
-        if (firstField instanceof HTMLElement) {
-            window.setTimeout(() => firstField.focus(), 40);
+        const focusTarget = authCloseButton instanceof HTMLElement
+            ? authCloseButton
+            : authCardPanel;
+        if (focusTarget instanceof HTMLElement) {
+            window.setTimeout(() => focusTarget.focus(), 40);
         }
     }
 

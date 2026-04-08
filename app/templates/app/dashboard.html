@@ -15,7 +15,6 @@
     data-dashboard-url="{% url 'app:dashboard-data' %}"
     data-trade-url="{% url 'app:trade-create' %}"
     data-trade-update-base-url="{% url 'app:trade-update' 0 %}"
-    data-demo-url="{% url 'app:demo-seed' %}"
     data-default-symbol="{{ trade_preferences.default_symbol }}"
     data-default-direction="{{ trade_preferences.default_direction }}"
     data-default-setup="{{ trade_preferences.default_setup }}"
@@ -98,9 +97,6 @@
             <div class="header-actions">
                 <span class="form-badge">{{ active_account.name }}</span>
                 <button type="button" class="primary-button" id="open-trade-modal">{% tr 'dashboard.new_trade' 'Nouveau trade' %}</button>
-                {% if request.user.is_superuser %}
-                    <button type="button" class="ghost-button" id="demo-button">{% tr 'dashboard.load_demo' 'Charger des donnees de demonstration' %}</button>
-                {% endif %}
                 <button type="button" class="ghost-button" id="refresh-button">{% tr 'common.refresh' 'Rafraichir' %}</button>
             </div>
         </header>

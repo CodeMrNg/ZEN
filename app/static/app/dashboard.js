@@ -16,7 +16,6 @@ if (appNode) {
         saveChanges: "Enregistrer les modifications",
         loadingDashboard: "Chargement du tableau de bord...",
         loadingDashboardDetails: "Chargement des indicateurs, graphiques, calendrier et executions recentes.",
-        loadingDemo: "Chargement du jeu de donnees de demonstration...",
         loadingTradeSave: "Enregistrement du trade en cours...",
         loadingTradeUpdate: "Mise a jour du trade en cours...",
         dashboardFailed: "Le tableau de bord n a pas pu etre charge.",
@@ -72,7 +71,6 @@ if (appNode) {
         editTradeButton: "Modifier le trade",
         chartMissing: "Chart.js n est pas charge. Verifiez le chargement des assets.",
         tradeSaveFailed: "Le trade n a pas pu etre enregistre.",
-        demoLoadFailed: "Le jeu de donnees de demonstration n a pas pu etre charge.",
         countdownOverdue: "Depasse de",
         countdownDisabled: "Desactive",
         countdownDay: "j",
@@ -92,7 +90,6 @@ if (appNode) {
         saveChanges: "Save changes",
         loadingDashboard: "Loading dashboard...",
         loadingDashboardDetails: "Loading metrics, charts, calendar, and recent executions.",
-        loadingDemo: "Loading demo dataset...",
         loadingTradeSave: "Saving trade...",
         loadingTradeUpdate: "Updating trade...",
         dashboardFailed: "The dashboard could not be loaded.",
@@ -148,7 +145,6 @@ if (appNode) {
         editTradeButton: "Edit trade",
         chartMissing: "Chart.js is not loaded. Check asset loading.",
         tradeSaveFailed: "The trade could not be saved.",
-        demoLoadFailed: "The demo dataset could not be loaded.",
         countdownOverdue: "Overdue by",
         countdownDisabled: "Disabled",
         countdownDay: "d",
@@ -215,14 +211,12 @@ if (appNode) {
         dashboard: appNode.dataset.dashboardUrl,
         trade: appNode.dataset.tradeUrl,
         tradeUpdateBase: appNode.dataset.tradeUpdateBaseUrl,
-        demo: appNode.dataset.demoUrl,
     };
 
     const metricsGrid = document.getElementById("metrics-grid");
     const monthSelector = document.getElementById("month-selector");
     const flashMessage = document.getElementById("flash-message");
     const pageLoader = document.getElementById("dashboard-loader");
-    const demoButton = document.getElementById("demo-button");
     const refreshButton = document.getElementById("refresh-button");
     const openTradeModalButton = document.getElementById("open-trade-modal");
     const openTradeModalSecondaryButton = document.getElementById("open-trade-modal-secondary");
@@ -303,9 +297,6 @@ if (appNode) {
             loadDashboard(monthSelector.value);
         });
 
-        if (demoButton) {
-            demoButton.addEventListener("click", handleDemoSeed);
-        }
         if (monthTradesButton) {
             monthTradesButton.addEventListener("click", openMonthTradesModal);
         }
@@ -1664,9 +1655,6 @@ if (appNode) {
 
     function setBusy(isBusy, loaderMessage = strings.loadingDashboard) {
         setButtonLoading(refreshButton, isBusy, strings.loading);
-        if (demoButton && !demoButton.classList.contains("is-loading")) {
-            demoButton.disabled = isBusy;
-        }
         togglePageLoader(pageLoader, isBusy, loaderMessage);
     }
 
@@ -1724,9 +1712,6 @@ if (appNode) {
         renderRecentTrades(payload.recent_trades);
         renderMonthlyTrades(payload.monthly_trades || [], payload.summary.selected_month_label);
         updateTradeCapitalHint();
-        if (demoButton) {
-            demoButton.hidden = payload.overview.all_time_trade_count > 0;
-        }
     }
 
     function indexPayloadDetails(payload) {
@@ -1785,8 +1770,15 @@ if (appNode) {
         }).join("");
     }
 
+    function getScoreToneClass(scoreValue) {
+        return Number(scoreValue) < 50 ? "is-loss" : "is-profit";
+    }
+
     function renderOverview(overview, selectedMonthLabel) {
-        document.getElementById("sidebar-score").textContent = overview.score;
+        const sidebarScore = document.getElementById("sidebar-score");
+        sidebarScore.textContent = overview.score;
+        sidebarScore.classList.remove("is-profit", "is-loss");
+        sidebarScore.classList.add(getScoreToneClass(overview.score));
         document.getElementById("sidebar-month").textContent = selectedMonthLabel;
         document.getElementById("overview-pnl").textContent = overview.all_time_pnl;
         document.getElementById("overview-trades").textContent = overview.all_time_trade_count;
@@ -1812,8 +1804,17 @@ if (appNode) {
     }
 
     function renderScorecard(scorecard, scoreValue) {
-        document.getElementById("score-pill").textContent = `Score ${scoreValue}`;
-        document.getElementById("score-value").textContent = scorecard.value;
+        const toneClass = getScoreToneClass(scoreValue);
+        const scorePill = document.getElementById("score-pill");
+        const scoreValueNode = document.getElementById("score-value");
+
+        scorePill.textContent = `Score ${scoreValue}`;
+        scorePill.classList.remove("is-profit", "is-loss");
+        scorePill.classList.add(toneClass);
+
+        scoreValueNode.textContent = scorecard.value;
+        scoreValueNode.classList.remove("is-profit", "is-loss");
+        scoreValueNode.classList.add(toneClass);
         document.getElementById("score-caption").textContent = scorecard.caption;
         document.getElementById("insight-list").innerHTML = scorecard.insights.map((line) => {
             return `<li>${line}</li>`;
@@ -2453,39 +2454,6 @@ if (appNode) {
             showFlash(error.message, "error");
         } finally {
             setButtonLoading(submitButton, false);
-            if (!state.controller) {
-                togglePageLoader(pageLoader, false);
-            }
-        }
-    }
-
-    async function handleDemoSeed() {
-        if (!demoButton) {
-            return;
-        }
-        setButtonLoading(demoButton, true, strings.loading);
-        togglePageLoader(pageLoader, true, strings.loadingDemo);
-
-        try {
-            const response = await fetch(endpoints.demo, {
-                method: "POST",
-                headers: {
-                    "X-CSRFToken": getCsrfToken(),
-                },
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || strings.demoLoadFailed);
-            }
-
-            showFlash(result.message, "success");
-            await loadDashboard();
-        } catch (error) {
-            showFlash(error.message, "error");
-        } finally {
-            setButtonLoading(demoButton, false);
             if (!state.controller) {
                 togglePageLoader(pageLoader, false);
             }

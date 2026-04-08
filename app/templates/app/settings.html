@@ -461,6 +461,56 @@
                     </section>
                 {% endif %}
 
+                {% if request.user.is_superuser and demo_dataset %}
+                    <section class="settings-section">
+                        <div class="settings-section-copy">
+                            <h3>{% tr 'settings.demo.title' 'Donnees de demonstration' %}</h3>
+                            <p>
+                                {% tr 'settings.demo.copy' 'Le super administrateur peut charger un jeu de demonstration sur le compte actif vide, puis le decharger depuis ce meme espace.' %}
+                            </p>
+                        </div>
+
+                        <div class="settings-summary">
+                            <article class="detail-card">
+                                <span>{% tr 'settings.demo.status' 'Statut' %}</span>
+                                <strong>
+                                    {% if demo_dataset.loaded %}
+                                        {% tr 'settings.demo.loaded' 'Jeu charge' %}
+                                    {% elif demo_dataset.action == 'load' %}
+                                        {% tr 'settings.demo.empty' 'Compte vide' %}
+                                    {% else %}
+                                        {% tr 'settings.demo.hidden' 'Indisponible' %}
+                                    {% endif %}
+                                </strong>
+                            </article>
+                            <article class="detail-card">
+                                <span>{% tr 'settings.demo.count' 'Trades demo' %}</span>
+                                <strong>{{ demo_dataset.trade_count }}</strong>
+                            </article>
+                        </div>
+
+                        {% if demo_dataset.action != 'hidden' %}
+                            <div class="server-refresh-actions">
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="{% if demo_dataset.loaded %}demo_clear{% else %}demo_seed{% endif %}">
+                                    <button
+                                        type="submit"
+                                        class="{% if demo_dataset.loaded %}danger-button{% else %}ghost-button{% endif %}"
+                                        data-loading-text="{% if demo_dataset.loaded %}{% tr 'settings.demo.unload_loading' 'Dechargement...' %}{% else %}{% tr 'settings.demo.load_loading' 'Chargement...' %}{% endif %}"
+                                    >
+                                        {% if demo_dataset.loaded %}
+                                            {% tr 'dashboard.unload_demo' 'Decharger les donnees de demonstration' %}
+                                        {% else %}
+                                            {% tr 'dashboard.load_demo' 'Charger des donnees de demonstration' %}
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </section>
+                {% endif %}
+
                 <section class="settings-section">
                     <div class="settings-section-copy">
                         <h3>{% tr 'settings.section.security' 'Securite' %}</h3>

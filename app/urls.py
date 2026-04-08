@@ -21,4 +21,5 @@ urlpatterns = [
     path('api/trades/<int:trade_id>/update/', views.update_trade_view, name='trade-update'),
     path('api/capital-movements/', views.create_capital_movement_view, name='capital-movement-create'),
     path('api/demo/', views.seed_demo_data_view, name='demo-seed'),
+    path('api/demo/clear/', views.clear_demo_data_view, name='demo-clear'),
 ]

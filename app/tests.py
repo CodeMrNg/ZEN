@@ -183,8 +183,27 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(payload['preferences']['default_symbol'], 'XAUUSD')
         self.assertEqual(payload['preferences']['currency'], 'USD')
         self.assertEqual(payload['preferences']['current_capital_formatted'], '$10,095')
+        self.assertEqual(payload['demo']['action'], 'hidden')
         self.assertEqual(len(payload['recent_trades']), 1)
         self.assertEqual(len(payload['monthly_trades']), 1)
+
+    def test_dashboard_api_exposes_demo_button_state_for_empty_and_seeded_account(self):
+        self.get_active_account()
+
+        empty_response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(empty_response.status_code, 200)
+        self.assertEqual(empty_response.json()['demo']['action'], 'load')
+        self.assertEqual(empty_response.json()['demo']['trade_count'], 0)
+
+        services.seed_demo_trades_for_user(self.user.pk)
+
+        seeded_response = self.client.get(reverse('app:dashboard-data'))
+
+        self.assertEqual(seeded_response.status_code, 200)
+        self.assertTrue(seeded_response.json()['demo']['loaded'])
+        self.assertEqual(seeded_response.json()['demo']['action'], 'unload')
+        self.assertGreater(seeded_response.json()['demo']['trade_count'], 0)
 
     def test_dashboard_view_repairs_invalid_sqlite_decimal_storage(self):
         if connection.vendor != 'sqlite':
@@ -918,7 +937,24 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()['ok'], False)
 
-    def test_dashboard_shows_super_admin_badge_and_demo_button_only_for_super_admin(self):
+    def test_demo_clear_endpoint_removes_seeded_dataset(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        services.seed_demo_trades_for_user(self.user.pk)
+
+        response = self.client.post(reverse('app:demo-clear'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['ok'], True)
+        self.assertEqual(Trade.objects.count(), 0)
+
+    def test_demo_clear_endpoint_is_restricted_to_super_admin(self):
+        response = self.client.post(reverse('app:demo-clear'))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()['ok'], False)
+
+    def test_dashboard_shows_super_admin_badge_only_for_super_admin(self):
         self.get_active_account()
 
         response = self.client.get(reverse('app:dashboard'))
@@ -931,8 +967,48 @@ class TradingJournalApiTests(TestCase):
 
         response = self.client.get(reverse('app:dashboard'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="demo-button"', html=False)
+        self.assertNotContains(response, 'id="demo-button"', html=False)
         self.assertContains(response, 'Super admin')
+
+    def test_settings_view_shows_demo_controls_only_for_super_admin(self):
+        self.get_active_account()
+
+        response = self.client.get(reverse('app:settings'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Donnees de demonstration')
+
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+
+        response = self.client.get(reverse('app:settings'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Donnees de demonstration')
+        self.assertContains(response, 'Charger des donnees de demonstration')
+
+    def test_settings_view_allows_super_admin_to_seed_and_clear_demo_data(self):
+        self.get_active_account()
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+
+        seed_response = self.client.post(
+            reverse('app:settings'),
+            data={'action': 'demo_seed'},
+        )
+
+        self.assertEqual(seed_response.status_code, 200)
+        self.assertContains(seed_response, 'Jeu de donnees de demonstration charge.')
+        self.assertGreater(Trade.objects.count(), 0)
+        self.assertContains(seed_response, 'Decharger les donnees de demonstration')
+
+        clear_response = self.client.post(
+            reverse('app:settings'),
+            data={'action': 'demo_clear'},
+        )
+
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertContains(clear_response, 'Jeu de donnees de demonstration decharge.')
+        self.assertEqual(Trade.objects.count(), 0)
+        self.assertContains(clear_response, 'Charger des donnees de demonstration')
 
     def test_dashboard_shows_server_refresh_countdown_only_for_super_admin(self):
         self.get_active_account()

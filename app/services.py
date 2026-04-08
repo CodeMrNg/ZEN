@@ -92,6 +92,8 @@ MONTH_LABELS = {
     },
 }
 
+DEMO_TRADE_NOTE = 'Trade de demonstration genere automatiquement pour illustrer le dashboard.'
+
 
 _sqlite_decimal_repair_lock = Lock()
 _NO_SQLITE_DECIMAL_UPDATE = object()
@@ -870,6 +872,26 @@ def build_calendar_payload(year, month, daily_totals, daily_counts, trades_by_da
     }
 
 
+def get_demo_dataset_state_for_user(user_id, account=None):
+    preferences = None
+    active_account = account
+    if active_account is None:
+        preferences = get_or_create_preferences_for_user(user_id)
+        active_account = get_or_create_active_account_for_user(user_id, preferences)
+
+    account_trades = filter_queryset_for_account(
+        Trade.objects.filter(user_id=user_id),
+        active_account,
+    )
+    demo_trade_count = account_trades.filter(notes=DEMO_TRADE_NOTE).count()
+    action = 'unload' if demo_trade_count else 'load' if not account_trades.exists() else 'hidden'
+    return {
+        'loaded': bool(demo_trade_count),
+        'trade_count': demo_trade_count,
+        'action': action,
+    }
+
+
 def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, language=None):
     language = normalize_language(language)
     preferences = get_or_create_preferences_for_user(user_id)
@@ -1085,6 +1107,7 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, lan
         Decimal('0.00'),
     )
     current_capital = active_account.capital_base + all_time_net_decimal + total_deposits - total_withdrawals
+    demo_state = get_demo_dataset_state_for_user(user_id, account=active_account)
 
     return {
         'summary': {
@@ -1104,6 +1127,7 @@ def build_dashboard_payload_for_user(user_id, raw_month=None, raw_year=None, lan
         },
         'available_years': available_year_options,
         'available_months': available_months,
+        'demo': demo_state,
         'metrics': metric_cards,
         'scorecard': {
             'value': overall_score,
@@ -1519,7 +1543,7 @@ def seed_demo_trades_for_user(user_id, language=None):
             risk_percent=risk_percent,
             capital_base=active_account.capital_base,
             confidence=(offset % 5) + 1,
-            notes='Trade de demonstration genere automatiquement pour illustrer le dashboard.',
+            notes=DEMO_TRADE_NOTE,
         )
         demo_trades.append(trade)
 
@@ -1527,3 +1551,34 @@ def seed_demo_trades_for_user(user_id, language=None):
         Trade.objects.bulk_create(demo_trades)
 
     return {'ok': True, 'message': tr('transactions.demo.loaded', language=language, default='Jeu de donnees de demonstration charge.')}
+
+
+def clear_demo_trades_for_user(user_id, language=None):
+    preferences = get_or_create_preferences_for_user(user_id)
+    active_account = get_or_create_active_account_for_user(user_id, preferences)
+    demo_trades = filter_queryset_for_account(
+        Trade.objects.filter(user_id=user_id, notes=DEMO_TRADE_NOTE),
+        active_account,
+    )
+
+    if not demo_trades.exists():
+        return {
+            'ok': False,
+            'message': tr(
+                'transactions.demo.missing',
+                language=language,
+                default='Aucune donnee de demonstration a decharger sur ce compte.',
+            ),
+        }
+
+    with transaction.atomic():
+        demo_trades.delete()
+
+    return {
+        'ok': True,
+        'message': tr(
+            'transactions.demo.unloaded',
+            language=language,
+            default='Jeu de donnees de demonstration decharge.',
+        ),
+    }

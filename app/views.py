@@ -32,6 +32,7 @@ from .services import (
     build_account_label,
     build_transactions_payload_for_user,
     build_dashboard_payload_for_user,
+    clear_demo_trades_for_user,
     create_capital_movement_for_user,
     create_trade_for_user,
     disable_server_refresh_tracking,
@@ -40,6 +41,7 @@ from .services import (
     format_signed_percent,
     get_or_create_active_account_for_user,
     get_current_capital_for_user,
+    get_demo_dataset_state_for_user,
     get_or_create_preferences_for_user,
     ensure_sqlite_decimal_storage_integrity,
     mark_server_refresh_updated,
@@ -440,6 +442,32 @@ def settings_view(request):
                     language=language,
                     default='Action reservee au super administrateur.',
                 )
+        elif action == 'demo_seed':
+            if request.user.is_superuser:
+                result = seed_demo_trades_for_user(request.user.pk, language=language)
+                if result.get('ok'):
+                    success_message = result['message']
+                else:
+                    error_message = result.get('message')
+            else:
+                error_message = translate(
+                    'views.error.super_admin_only',
+                    language=language,
+                    default='Action reservee au super administrateur.',
+                )
+        elif action == 'demo_clear':
+            if request.user.is_superuser:
+                result = clear_demo_trades_for_user(request.user.pk, language=language)
+                if result.get('ok'):
+                    success_message = result['message']
+                else:
+                    error_message = result.get('message')
+            else:
+                error_message = translate(
+                    'views.error.super_admin_only',
+                    language=language,
+                    default='Action reservee au super administrateur.',
+                )
         elif action == 'delete_account':
             delete_account_form = DeleteAccountForm(request.POST, user=request.user, language=language)
             if delete_account_form.is_valid():
@@ -454,6 +482,7 @@ def settings_view(request):
     archived_trading_accounts = get_archived_trading_accounts_for_user(request.user.pk)
     if request.user.is_superuser:
         server_refresh = build_server_refresh_snapshot(language=language)
+    demo_dataset = get_demo_dataset_state_for_user(request.user.pk, account=active_account) if request.user.is_superuser else None
     current_capital = get_current_capital_for_user(request.user.pk, preferences, account=active_account)
     initial_capital_gp_percent = (
         ((current_capital - active_account.capital_base) / active_account.capital_base) * Decimal('100')
@@ -490,6 +519,7 @@ def settings_view(request):
             'success_message': success_message,
             'error_message': error_message,
             'server_refresh': server_refresh,
+            'demo_dataset': demo_dataset,
         },
     )
     if response_language:
@@ -617,5 +647,23 @@ async def seed_demo_data_view(request):
             status=403,
         )
     result = await sync_to_async(seed_demo_trades_for_user)(user.pk, language)
+    status = 200 if result.get('ok') else 400
+    return JsonResponse(result, status=status)
+
+
+@login_required
+@require_POST
+async def clear_demo_data_view(request):
+    user = await request.auser()
+    language = normalize_language(getattr(request, 'LANGUAGE_CODE', None))
+    if not user.is_superuser:
+        return JsonResponse(
+            {
+                'ok': False,
+                'message': translate('dashboard.demo.super_admin_only', language),
+            },
+            status=403,
+        )
+    result = await sync_to_async(clear_demo_trades_for_user)(user.pk, language)
     status = 200 if result.get('ok') else 400
     return JsonResponse(result, status=status)

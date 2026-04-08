@@ -1250,6 +1250,16 @@ button {
     word-break: break-word;
 }
 
+.sidebar-card strong.is-profit,
+.score-summary strong.is-profit {
+    color: #bff9df;
+}
+
+.sidebar-card strong.is-loss,
+.score-summary strong.is-loss {
+    color: #ffd1d1;
+}
+
 .sidebar-card p {
     margin: 0;
     color: var(--muted);
@@ -1837,6 +1847,18 @@ button {
     color: var(--muted-strong);
     font-weight: 700;
     font-size: 0.85rem;
+}
+
+.score-pill.is-profit {
+    color: #bff9df;
+    background: rgba(53, 212, 154, 0.12);
+    border-color: rgba(53, 212, 154, 0.26);
+}
+
+.score-pill.is-loss {
+    color: #ffd1d1;
+    background: rgba(239, 100, 100, 0.12);
+    border-color: rgba(239, 100, 100, 0.26);
 }
 
 .panel-expand {
@@ -3985,9 +4007,12 @@ button {
         inset: 0;
         z-index: 110;
         display: none;
-        align-items: flex-end;
+        align-items: stretch;
         justify-content: center;
-        padding: 16px;
+        padding:
+            calc(12px + env(safe-area-inset-top))
+            16px
+            calc(16px + env(safe-area-inset-bottom));
     }
 
     .auth-body.auth-mobile-ready.auth-modal-open {
@@ -4010,10 +4035,14 @@ button {
     .auth-card-panel {
         position: relative;
         z-index: 1;
+        margin-top: auto;
         width: min(720px, 100%);
         max-height: calc(100vh - 32px);
+        max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         overflow: auto;
-        padding: 28px 24px;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: 28px 24px calc(24px + env(safe-area-inset-bottom));
         border-left: 0;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 28px;
@@ -4025,6 +4054,10 @@ button {
         align-items: flex-start;
     }
 
+    .auth-card-top {
+        padding-right: 56px;
+    }
+
     .auth-mode-pill {
         white-space: normal;
     }
@@ -4032,8 +4065,8 @@ button {
     .auth-body.auth-mobile-ready.auth-modal-open .auth-panel-close {
         display: inline-flex !important;
         position: absolute;
-        top: 0;
-        right: 0;
+        top: 14px;
+        right: 14px;
     }
 
     .sidebar-card,
@@ -4341,6 +4374,24 @@ button {
     .hero-tape span {
         width: 100%;
         text-align: center;
+    }
+
+    .auth-body.auth-mobile-ready .auth-panel {
+        padding:
+            calc(10px + env(safe-area-inset-top))
+            12px
+            calc(12px + env(safe-area-inset-bottom));
+    }
+
+    .auth-card-panel {
+        max-height: calc(100vh - 20px);
+        max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .auth-card-top {
+        gap: 14px;
+        padding-right: 52px;
     }
 
     .sidebar {

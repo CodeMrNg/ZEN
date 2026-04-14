@@ -1,4 +1,6 @@
 import calendar
+import re
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django import forms
@@ -663,6 +665,187 @@ class DeleteAccountForm(forms.Form):
         if self.user is None or not self.user.check_password(password):
             raise forms.ValidationError(tr(self.language, 'form.delete.invalid_password', 'Le mot de passe saisi est incorrect.'))
         return password
+
+
+class TradingDataExportForm(forms.Form):
+    PERIOD_ALL_TIME = 'all_time'
+    PERIOD_DAY = 'day'
+    PERIOD_WEEK = 'week'
+    PERIOD_MONTH = 'month'
+    PERIOD_YEAR = 'year'
+
+    period = forms.ChoiceField(
+        label='Periode a exporter',
+        choices=(
+            (PERIOD_ALL_TIME, 'Tout le temps'),
+            (PERIOD_DAY, 'Jour'),
+            (PERIOD_WEEK, 'Semaine'),
+            (PERIOD_MONTH, 'Mois'),
+            (PERIOD_YEAR, 'Annee'),
+        ),
+        initial=PERIOD_ALL_TIME,
+    )
+    day = forms.DateField(
+        required=False,
+        label='Jour',
+        input_formats=['%Y-%m-%d'],
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    week = forms.CharField(
+        required=False,
+        label='Semaine',
+        max_length=8,
+        widget=forms.TextInput(attrs={'type': 'week'}),
+    )
+    month = forms.CharField(
+        required=False,
+        label='Mois',
+        max_length=7,
+        widget=forms.TextInput(attrs={'type': 'month'}),
+    )
+    year = forms.IntegerField(
+        required=False,
+        label='Annee',
+        min_value=1900,
+        max_value=9999,
+        widget=forms.NumberInput(attrs={'inputmode': 'numeric', 'step': '1', 'min': '1900', 'max': '9999'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.language = normalize_language(kwargs.pop('language', 'fr'))
+        super().__init__(*args, **kwargs)
+        remove_autofocus_from_fields(self)
+
+        period_choices = (
+            (self.PERIOD_ALL_TIME, tr(self.language, 'settings.export.period.all_time', 'Tout le temps')),
+            (self.PERIOD_DAY, tr(self.language, 'settings.export.period.day', 'Jour')),
+            (self.PERIOD_WEEK, tr(self.language, 'settings.export.period.week', 'Semaine')),
+            (self.PERIOD_MONTH, tr(self.language, 'settings.export.period.month', 'Mois')),
+            (self.PERIOD_YEAR, tr(self.language, 'settings.export.period.year', 'Annee')),
+        )
+        self.fields['period'].label = tr(self.language, 'settings.export.period_label', 'Periode a exporter')
+        self.fields['period'].choices = period_choices
+        self.fields['period'].widget.choices = period_choices
+        self.fields['period'].widget.attrs.update(
+            {
+                'autocomplete': 'off',
+                'data-export-period-select': 'true',
+            }
+        )
+        self.fields['day'].label = tr(self.language, 'settings.export.day_label', 'Jour')
+        self.fields['week'].label = tr(self.language, 'settings.export.week_label', 'Semaine')
+        self.fields['month'].label = tr(self.language, 'settings.export.month_label', 'Mois')
+        self.fields['year'].label = tr(self.language, 'settings.export.year_label', 'Annee')
+
+        today = timezone.localdate()
+        iso_year, iso_week, _ = today.isocalendar()
+        if not self.is_bound:
+            self.fields['day'].initial = today
+            self.fields['week'].initial = f'{iso_year}-W{iso_week:02d}'
+            self.fields['month'].initial = today.strftime('%Y-%m')
+            self.fields['year'].initial = today.year
+
+    def clean_week(self):
+        week_value = (self.cleaned_data.get('week') or '').strip()
+        if not week_value:
+            return ''
+        if not re.fullmatch(r'\d{4}-W\d{2}', week_value):
+            raise forms.ValidationError(tr(self.language, 'settings.export.week_invalid', 'Selectionnez une semaine valide.'))
+        return week_value
+
+    def clean_month(self):
+        month_value = (self.cleaned_data.get('month') or '').strip()
+        if not month_value:
+            return ''
+        if not re.fullmatch(r'\d{4}-\d{2}', month_value):
+            raise forms.ValidationError(tr(self.language, 'settings.export.month_invalid', 'Selectionnez un mois valide.'))
+        return month_value
+
+    def clean(self):
+        cleaned_data = super().clean()
+        period = cleaned_data.get('period') or self.PERIOD_ALL_TIME
+        today = timezone.localdate()
+        start_date = None
+        end_date = None
+        label = tr(self.language, 'settings.export.scope.all_time', 'Tout le temps')
+        token = 'all-time'
+
+        if period == self.PERIOD_DAY:
+            selected_day = cleaned_data.get('day')
+            if not selected_day:
+                self.add_error('day', tr(self.language, 'settings.export.day_required', 'Choisissez un jour a exporter.'))
+            else:
+                start_date = selected_day
+                end_date = selected_day
+                label = selected_day.strftime('%d/%m/%Y')
+                token = selected_day.isoformat()
+        elif period == self.PERIOD_WEEK:
+            week_value = cleaned_data.get('week')
+            if not week_value:
+                self.add_error('week', tr(self.language, 'settings.export.week_required', 'Choisissez une semaine a exporter.'))
+            else:
+                year_label, week_label = week_value.split('-W', 1)
+                try:
+                    start_date = date.fromisocalendar(int(year_label), int(week_label), 1)
+                except ValueError:
+                    self.add_error('week', tr(self.language, 'settings.export.week_invalid', 'Selectionnez une semaine valide.'))
+                else:
+                    end_date = start_date + timedelta(days=6)
+                    label = (
+                        tr(
+                            self.language,
+                            'settings.export.scope.week',
+                            'Semaine du {start} au {end}',
+                        ).format(
+                            start=start_date.strftime('%d/%m/%Y'),
+                            end=end_date.strftime('%d/%m/%Y'),
+                        )
+                    )
+                    token = week_value
+        elif period == self.PERIOD_MONTH:
+            month_value = cleaned_data.get('month')
+            if not month_value:
+                self.add_error('month', tr(self.language, 'settings.export.month_required', 'Choisissez un mois a exporter.'))
+            else:
+                year_label, month_label = month_value.split('-', 1)
+                try:
+                    start_date = date(int(year_label), int(month_label), 1)
+                except ValueError:
+                    self.add_error('month', tr(self.language, 'settings.export.month_invalid', 'Selectionnez un mois valide.'))
+                else:
+                    if start_date.month == 12:
+                        end_date = date(start_date.year + 1, 1, 1) - timedelta(days=1)
+                    else:
+                        end_date = date(start_date.year, start_date.month + 1, 1) - timedelta(days=1)
+                    label = start_date.strftime('%m/%Y')
+                    token = month_value
+        elif period == self.PERIOD_YEAR:
+            selected_year = cleaned_data.get('year')
+            if not selected_year:
+                self.add_error('year', tr(self.language, 'settings.export.year_required', 'Choisissez une annee a exporter.'))
+            else:
+                start_date = date(int(selected_year), 1, 1)
+                end_date = date(int(selected_year), 12, 31)
+                label = str(selected_year)
+                token = str(selected_year)
+        else:
+            cleaned_data['period'] = self.PERIOD_ALL_TIME
+            cleaned_data.setdefault('day', today)
+
+        if self.errors:
+            return cleaned_data
+
+        cleaned_data['scope'] = {
+            'period': cleaned_data.get('period') or self.PERIOD_ALL_TIME,
+            'label': label,
+            'start_date': start_date,
+            'end_date': end_date,
+            'filename_token': token,
+        }
+        return cleaned_data
+
+    def get_scope(self):
+        return self.cleaned_data['scope']
 
 
 class CapitalMovementForm(forms.ModelForm):

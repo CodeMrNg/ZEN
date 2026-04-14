@@ -110,6 +110,12 @@
             </div>
         {% endif %}
 
+        {% if export_form.non_field_errors %}
+            <div class="flash-message is-error">
+                {{ export_form.non_field_errors|join:', ' }}
+            </div>
+        {% endif %}
+
         <section class="dashboard-grid settings-grid">
             <article class="panel settings-panel-accounts">
                 <div class="panel-heading">
@@ -510,6 +516,81 @@
                         {% endif %}
                     </section>
                 {% endif %}
+
+                <section class="settings-section settings-section-accent">
+                    <div class="settings-section-copy">
+                        <h3>{% tr 'settings.export.title' 'Exporter toutes mes donnees' %}</h3>
+                        <p>
+                            {% tr 'settings.export.copy' 'Telechargez un fichier Excel complet avec votre profil, vos preferences, tous vos comptes, vos trades, vos mouvements de capital et les references de vos captures. Le filtre de periode s applique aux trades, mouvements et captures.' %}
+                        </p>
+                    </div>
+
+                    <form method="post" class="trade-form settings-form" data-export-form>
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="export_data">
+
+                        <div class="form-grid">
+                            <div class="field-group">
+                                <label for="{{ export_form.period.id_for_label }}">{{ export_form.period.label }}</label>
+                                {{ export_form.period }}
+                                <small class="field-help">
+                                    {% tr 'settings.export.period_help' 'Choisissez la granularite du filtre a appliquer avant de generer le fichier Excel.' %}
+                                </small>
+                                {% for error in export_form.period.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group" data-export-period-panel="day">
+                                <label for="{{ export_form.day.id_for_label }}">{{ export_form.day.label }}</label>
+                                {{ export_form.day }}
+                                {% for error in export_form.day.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group" data-export-period-panel="week">
+                                <label for="{{ export_form.week.id_for_label }}">{{ export_form.week.label }}</label>
+                                {{ export_form.week }}
+                                {% for error in export_form.week.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group" data-export-period-panel="month">
+                                <label for="{{ export_form.month.id_for_label }}">{{ export_form.month.label }}</label>
+                                {{ export_form.month }}
+                                {% for error in export_form.month.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group" data-export-period-panel="year">
+                                <label for="{{ export_form.year.id_for_label }}">{{ export_form.year.label }}</label>
+                                {{ export_form.year }}
+                                {% for error in export_form.year.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group field-span-2" data-export-period-panel="all_time">
+                                <span class="field-static-label">{% tr 'settings.export.all_time_label' 'Periode exportee' %}</span>
+                                <div class="field-static-box">
+                                    {% tr 'settings.export.all_time_value' 'Toutes les donnees temporelles seront incluses.' %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <p class="form-caption">
+                                {% tr 'settings.export.caption' 'Le fichier .xlsx genere plusieurs onglets pour couvrir l ensemble de vos donnees utilisateur.' %}
+                            </p>
+                            <button type="submit" class="primary-button" data-loading-text="{% tr 'settings.export.loading' 'Preparation du fichier Excel...' %}">
+                                {% tr 'settings.export.submit' 'Exporter en Excel' %}
+                            </button>
+                        </div>
+                    </form>
+                </section>
 
                 <section class="settings-section">
                     <div class="settings-section-copy">

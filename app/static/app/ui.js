@@ -399,6 +399,40 @@
         });
     }
 
+    function bindExportPeriodSelectors() {
+        const forms = Array.from(document.querySelectorAll("[data-export-form]"));
+        if (!forms.length) {
+            return;
+        }
+
+        forms.forEach((form) => {
+            const periodSelect = form.querySelector("[data-export-period-select]");
+            const panels = Array.from(form.querySelectorAll("[data-export-period-panel]"));
+            if (!(periodSelect instanceof HTMLSelectElement) || !panels.length) {
+                return;
+            }
+
+            const syncPanels = () => {
+                const selectedPeriod = periodSelect.value || "all_time";
+                panels.forEach((panel) => {
+                    const isActive = panel.dataset.exportPeriodPanel === selectedPeriod;
+                    panel.hidden = !isActive;
+                    panel.setAttribute("aria-hidden", String(!isActive));
+
+                    panel.querySelectorAll("input, select, textarea").forEach((input) => {
+                        if (input === periodSelect) {
+                            return;
+                        }
+                        input.disabled = !isActive;
+                    });
+                });
+            };
+
+            periodSelect.addEventListener("change", syncPanels);
+            syncPanels();
+        });
+    }
+
     window.AkiliUI = {
         setButtonLoading,
         togglePageLoader,
@@ -414,5 +448,6 @@
         bindConfirmButtons();
         bindAccountSwitcher();
         bindAccountEditButtons();
+        bindExportPeriodSelectors();
     }, { once: true });
 })();

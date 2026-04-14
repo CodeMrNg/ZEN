@@ -4,6 +4,7 @@ import shutil
 import tempfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
@@ -14,9 +15,11 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from . import services
 from .error_views import custom_page_not_found, custom_server_error
+from .forms import TradingDataExportForm
 from .localization import translate
 from .models import CapitalMovement, ServerRefreshStatus, SocialLink, Trade, TradingAccount, TradingPreference
 
@@ -105,6 +108,35 @@ class LocalizationProviderTests(SimpleTestCase):
         value = translate("dashboard.header.title", language="en")
 
         self.assertEqual(value, "Performance dashboard")
+
+
+class TradingDataExportFormTests(SimpleTestCase):
+    def test_export_form_builds_week_scope(self):
+        form = TradingDataExportForm(
+            data={
+                'period': TradingDataExportForm.PERIOD_WEEK,
+                'week': '2026-W16',
+            },
+            language='fr',
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        scope = form.get_scope()
+        self.assertEqual(scope['period'], TradingDataExportForm.PERIOD_WEEK)
+        self.assertEqual(scope['start_date'], date(2026, 4, 13))
+        self.assertEqual(scope['end_date'], date(2026, 4, 19))
+        self.assertEqual(scope['filename_token'], '2026-W16')
+
+    def test_export_form_requires_matching_period_value(self):
+        form = TradingDataExportForm(
+            data={
+                'period': TradingDataExportForm.PERIOD_MONTH,
+            },
+            language='fr',
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('month', form.errors)
 
 
 @override_settings(APP_TRANSLATION_PROVIDER="builtin")
@@ -1449,6 +1481,164 @@ class TradingJournalApiTests(TestCase):
         self.assertContains(response, '$10,000')
         self.assertContains(response, '+3.95%')
         self.assertContains(response, 'Capital initial')
+
+    def test_settings_view_exports_complete_excel_workbook(self):
+        account = self.get_active_account()
+        archived_account = TradingAccount.objects.create(
+            user=self.user,
+            name='Compte archive export',
+            broker='FTMO',
+            account_identifier='ARCH-01',
+            capital_base=Decimal('5000.00'),
+            currency='EUR',
+        )
+        archived_account.archived_at = timezone.now()
+        archived_account.save(update_fields=['archived_at', 'updated_at'])
+
+        trade = self.create_trade()
+        trade.screenshot = self.make_test_image('legacy-export.gif')
+        trade.save(update_fields=['screenshot', 'updated_at'])
+        trade.screenshots.create(image=self.make_test_image('gallery-export.gif'), sort_order=0)
+
+        CapitalMovement.objects.create(
+            user=self.user,
+            account=account,
+            kind=CapitalMovement.Kind.DEPOSIT,
+            amount=Decimal('750.00'),
+            occurred_at=timezone.now(),
+            note='Depot export',
+        )
+
+        response = self.client.post(
+            reverse('app:settings'),
+            data={
+                'action': 'export_data',
+                'period': TradingDataExportForm.PERIOD_ALL_TIME,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertIn('attachment; filename="zen-trading-export-all-time.xlsx"', response['Content-Disposition'])
+
+        workbook = load_workbook(filename=BytesIO(response.content))
+
+        self.assertEqual(
+            workbook.sheetnames,
+            ['Resume', 'Utilisateur', 'Preferences', 'Comptes', 'Trades', 'Mouvements', 'Captures'],
+        )
+
+        user_rows = list(workbook['Utilisateur'].iter_rows(values_only=True))
+        self.assertEqual(user_rows[1][1], self.user.username)
+
+        account_rows = list(workbook['Comptes'].iter_rows(values_only=True))
+        self.assertEqual(len(account_rows), 3)
+        self.assertTrue(any(row[1] == 'Compte archive export' and row[7] is True for row in account_rows[1:]))
+
+        trade_rows = list(workbook['Trades'].iter_rows(values_only=True))
+        self.assertEqual(len(trade_rows), 2)
+        self.assertEqual(trade_rows[1][10], 'Breakout')
+        self.assertEqual(trade_rows[1][25], 'Trade test')
+        self.assertEqual(trade_rows[1][27], 2)
+
+        movement_rows = list(workbook['Mouvements'].iter_rows(values_only=True))
+        self.assertEqual(len(movement_rows), 2)
+        self.assertEqual(movement_rows[1][7], 'Depot export')
+
+        screenshot_rows = list(workbook['Captures'].iter_rows(values_only=True))
+        self.assertEqual(len(screenshot_rows), 3)
+        self.assertEqual({row[5] for row in screenshot_rows[1:]}, {'legacy', 'gallery'})
+
+    def test_settings_view_exports_only_selected_month_for_time_series_data(self):
+        account = self.get_active_account()
+        april_trade = Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 4, 10, 9, 15)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Trade avril',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('2.00'),
+            exit_price=Decimal('1.1250'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('120.00'),
+            fees=Decimal('5.00'),
+            risk_amount=Decimal('60.00'),
+            risk_percent=Decimal('0.60'),
+            capital_base=Decimal('10000.00'),
+            confidence=4,
+        )
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 3, 18, 14, 0)),
+            symbol='NAS100',
+            market='Indices',
+            direction=Trade.Direction.SHORT,
+            result=Trade.Result.STOP_LOSS,
+            setup='Trade mars',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('-1.00'),
+            exit_price=Decimal('1.0800'),
+            quantity=Decimal('1.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('-60.00'),
+            fees=Decimal('3.00'),
+            risk_amount=Decimal('60.00'),
+            risk_percent=Decimal('0.60'),
+            capital_base=Decimal('10000.00'),
+            confidence=3,
+        )
+
+        CapitalMovement.objects.create(
+            user=self.user,
+            account=account,
+            kind=CapitalMovement.Kind.DEPOSIT,
+            amount=Decimal('300.00'),
+            occurred_at=timezone.make_aware(datetime(2026, 4, 8, 8, 0)),
+            note='Mouvement avril',
+        )
+        CapitalMovement.objects.create(
+            user=self.user,
+            account=account,
+            kind=CapitalMovement.Kind.WITHDRAWAL,
+            amount=Decimal('100.00'),
+            occurred_at=timezone.make_aware(datetime(2026, 3, 8, 8, 0)),
+            note='Mouvement mars',
+        )
+
+        response = self.client.post(
+            reverse('app:settings'),
+            data={
+                'action': 'export_data',
+                'period': TradingDataExportForm.PERIOD_MONTH,
+                'month': '2026-04',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        workbook = load_workbook(filename=BytesIO(response.content))
+        trade_rows = list(workbook['Trades'].iter_rows(values_only=True))
+        movement_rows = list(workbook['Mouvements'].iter_rows(values_only=True))
+        account_rows = list(workbook['Comptes'].iter_rows(values_only=True))
+
+        self.assertEqual(len(trade_rows), 2)
+        self.assertEqual(trade_rows[1][0], april_trade.pk)
+        self.assertEqual(trade_rows[1][10], 'Trade avril')
+
+        self.assertEqual(len(movement_rows), 2)
+        self.assertEqual(movement_rows[1][7], 'Mouvement avril')
+
+        self.assertEqual(len(account_rows), 2)
+        self.assertEqual(account_rows[1][1], account.name)
 
     def test_settings_view_does_not_autofocus_any_input(self):
         self.get_active_account()

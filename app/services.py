@@ -3,9 +3,11 @@ import random
 from decimal import Context
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from io import BytesIO
 from decimal import Decimal, InvalidOperation
 from statistics import pstdev
 from threading import Lock
+from urllib.parse import urljoin
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
@@ -653,6 +655,440 @@ def serialize_preferences(preferences, current_capital=None, account=None, langu
             'label': build_account_label(account, language=language),
         },
     }
+
+
+def _local_datetime_for_excel(value):
+    if not value:
+        return None
+    if timezone.is_aware(value):
+        return timezone.localtime(value).replace(tzinfo=None)
+    return value
+
+
+def _normalize_export_cell_value(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, datetime):
+        return _local_datetime_for_excel(value)
+    return value
+
+
+def _autosize_export_columns(worksheet):
+    for column_cells in worksheet.columns:
+        max_length = 0
+        column_letter = column_cells[0].column_letter
+        for cell in column_cells:
+            if cell.value in (None, ''):
+                continue
+            if isinstance(cell.value, datetime):
+                cell_length = len(cell.value.strftime('%Y-%m-%d %H:%M:%S'))
+            else:
+                cell_length = len(str(cell.value))
+            max_length = max(max_length, cell_length)
+        worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 12), 42)
+
+
+def _append_export_sheet(workbook, title, headers, rows):
+    from openpyxl.styles import Font, PatternFill
+
+    worksheet = workbook.create_sheet(title=title)
+    worksheet.append(headers)
+    header_fill = PatternFill(fill_type='solid', fgColor='C8F800')
+    header_font = Font(bold=True, color='06140F')
+
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+
+    for row in rows:
+        worksheet.append([_normalize_export_cell_value(value) for value in row])
+
+    worksheet.freeze_panes = 'A2'
+    _autosize_export_columns(worksheet)
+    return worksheet
+
+
+def _apply_export_scope_to_queryset(queryset, field_name, scope):
+    start_datetime = scope.get('start_datetime')
+    end_datetime = scope.get('end_datetime')
+    if start_datetime is not None:
+        queryset = queryset.filter(**{f'{field_name}__gte': start_datetime})
+    if end_datetime is not None:
+        queryset = queryset.filter(**{f'{field_name}__lte': end_datetime})
+    return queryset
+
+
+def _get_export_scope_datetimes(scope):
+    start_date = scope.get('start_date')
+    end_date = scope.get('end_date')
+    if start_date is None or end_date is None:
+        return None, None
+
+    current_timezone = timezone.get_current_timezone()
+    start_datetime = timezone.make_aware(datetime.combine(start_date, datetime.min.time()), current_timezone)
+    end_datetime = timezone.make_aware(datetime.combine(end_date, datetime.max.time()), current_timezone)
+    return start_datetime, end_datetime
+
+
+def _safe_media_reference(file_field, base_url=None):
+    if not file_field:
+        return '', '', ''
+
+    relative_path = (getattr(file_field, 'name', '') or '').replace('\\', '/')
+    if not relative_path:
+        return '', '', ''
+
+    try:
+        relative_url = file_field.url
+    except ValueError:
+        relative_url = ''
+
+    absolute_url = urljoin(base_url, relative_url.lstrip('/')) if base_url and relative_url else relative_url
+    return relative_path.split('/')[-1], relative_path, absolute_url
+
+
+def build_user_data_export_workbook(user, scope, language=None, base_url=None):
+    from openpyxl import Workbook
+
+    scope = dict(scope or {})
+    start_datetime, end_datetime = _get_export_scope_datetimes(scope)
+    scope['start_datetime'] = start_datetime
+    scope['end_datetime'] = end_datetime
+
+    preferences = get_or_create_preferences_for_user(user.pk)
+    active_account = get_or_create_active_account_for_user(user.pk, preferences)
+    all_accounts = list(get_trading_accounts_for_user(user.pk, include_archived=True))
+    trade_queryset = _apply_export_scope_to_queryset(
+        Trade.objects.filter(user_id=user.pk).select_related('account').prefetch_related('screenshots').order_by('-executed_at', '-created_at'),
+        'executed_at',
+        scope,
+    )
+    movement_queryset = _apply_export_scope_to_queryset(
+        CapitalMovement.objects.filter(user_id=user.pk).select_related('account').order_by('-occurred_at', '-created_at'),
+        'occurred_at',
+        scope,
+    )
+    trades = list(trade_queryset)
+    movements = list(movement_queryset)
+
+    workbook = Workbook()
+    summary_sheet = workbook.active
+    summary_sheet.title = 'Resume'
+
+    summary_rows = [
+        (tr('settings.export.summary.generated_at', language=language, default='Export genere le'), _local_datetime_for_excel(timezone.now())),
+        (tr('settings.export.summary.username', language=language, default='Identifiant'), user.username),
+        (tr('settings.export.summary.email', language=language, default='Email'), user.email or ''),
+        (tr('settings.export.summary.active_account', language=language, default='Compte actif'), build_account_label(active_account, language=language)),
+        (tr('settings.export.summary.scope', language=language, default='Filtre applique'), scope.get('label') or tr('settings.export.scope.all_time', language=language, default='Tout le temps')),
+        (tr('settings.export.summary.period_start', language=language, default='Debut de periode'), scope.get('start_date') or tr('settings.export.summary.not_limited', language=language, default='Non limite')),
+        (tr('settings.export.summary.period_end', language=language, default='Fin de periode'), scope.get('end_date') or tr('settings.export.summary.not_limited', language=language, default='Non limite')),
+        (tr('settings.export.summary.accounts', language=language, default='Comptes exportes'), len(all_accounts)),
+        (tr('settings.export.summary.trades', language=language, default='Trades exportes'), len(trades)),
+        (tr('settings.export.summary.movements', language=language, default='Mouvements exportes'), len(movements)),
+        (
+            tr('settings.export.summary.screenshots', language=language, default='Captures exportees'),
+            sum(len(serialize_trade_screenshots(trade)) for trade in trades),
+        ),
+        (
+            tr('settings.export.summary.note', language=language, default='Note'),
+            tr(
+                'settings.export.summary.note_value',
+                language=language,
+                default='Le filtre de periode s applique aux trades, mouvements et captures. Les feuilles utilisateur, preferences et comptes restent completes.',
+            ),
+        ),
+    ]
+    summary_sheet.append(
+        [
+            tr('settings.export.summary.label_column', language=language, default='Champ'),
+            tr('settings.export.summary.value_column', language=language, default='Valeur'),
+        ]
+    )
+    for row in summary_rows:
+        summary_sheet.append([_normalize_export_cell_value(value) for value in row])
+    _append_export_sheet(
+        workbook,
+        'Utilisateur',
+        [
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'is_staff',
+            'is_superuser',
+            'date_joined',
+            'last_login',
+        ],
+        [[
+            user.pk,
+            user.username,
+            user.first_name or '',
+            user.last_name or '',
+            user.email or '',
+            user.is_staff,
+            user.is_superuser,
+            _local_datetime_for_excel(user.date_joined),
+            _local_datetime_for_excel(user.last_login),
+        ]],
+    )
+    _append_export_sheet(
+        workbook,
+        'Preferences',
+        [
+            'user_id',
+            'active_account_id',
+            'active_account_name',
+            'default_symbol',
+            'default_direction',
+            'default_setup',
+            'default_lot_size',
+            'default_risk_percent',
+            'default_fees',
+            'default_confidence',
+            'capital_base',
+            'currency',
+            'ui_language',
+            'default_dashboard_year',
+            'default_week_start_day',
+            'created_at',
+            'updated_at',
+        ],
+        [[
+            user.pk,
+            preferences.active_account_id,
+            build_account_label(preferences.active_account or active_account, language=language),
+            preferences.default_symbol,
+            preferences.default_direction,
+            preferences.default_setup,
+            preferences.default_lot_size,
+            preferences.default_risk_percent,
+            preferences.default_fees,
+            preferences.default_confidence,
+            preferences.capital_base,
+            preferences.currency,
+            preferences.ui_language,
+            preferences.default_dashboard_year,
+            preferences.default_week_start_day,
+            _local_datetime_for_excel(preferences.created_at),
+            _local_datetime_for_excel(preferences.updated_at),
+        ]],
+    )
+    _append_export_sheet(
+        workbook,
+        'Comptes',
+        [
+            'id',
+            'name',
+            'broker',
+            'account_identifier',
+            'currency',
+            'capital_base',
+            'is_active',
+            'is_archived',
+            'created_at',
+            'archived_at',
+            'updated_at',
+        ],
+        [[
+            account.pk,
+            account.name,
+            account.broker,
+            account.account_identifier,
+            account.currency,
+            account.capital_base,
+            account.pk == active_account.pk,
+            account.is_archived,
+            _local_datetime_for_excel(account.created_at),
+            _local_datetime_for_excel(account.archived_at),
+            _local_datetime_for_excel(account.updated_at),
+        ] for account in all_accounts],
+    )
+
+    trade_rows = []
+    screenshot_rows = []
+    for trade in trades:
+        legacy_name, legacy_path, legacy_url = _safe_media_reference(trade.screenshot, base_url=base_url)
+        serialized_screenshots = serialize_trade_screenshots(trade)
+        screenshot_names = []
+        screenshot_urls = []
+
+        if legacy_name:
+            screenshot_names.append(legacy_name)
+        if legacy_url:
+            screenshot_urls.append(legacy_url)
+
+        for screenshot in trade.screenshots.all():
+            image_name, image_path, image_url = _safe_media_reference(screenshot.image, base_url=base_url)
+            screenshot_names.append(image_name)
+            if image_url:
+                screenshot_urls.append(image_url)
+            screenshot_rows.append(
+                [
+                    trade.pk,
+                    trade.account_id,
+                    trade.account.name if trade.account else '',
+                    trade.symbol,
+                    _local_datetime_for_excel(trade.executed_at),
+                    'gallery',
+                    screenshot.pk,
+                    screenshot.sort_order,
+                    image_name,
+                    image_path,
+                    image_url,
+                    _local_datetime_for_excel(screenshot.created_at),
+                ]
+            )
+
+        if legacy_name or legacy_path or legacy_url:
+            screenshot_rows.append(
+                [
+                    trade.pk,
+                    trade.account_id,
+                    trade.account.name if trade.account else '',
+                    trade.symbol,
+                    _local_datetime_for_excel(trade.executed_at),
+                    'legacy',
+                    'legacy',
+                    '',
+                    legacy_name,
+                    legacy_path,
+                    legacy_url,
+                    '',
+                ]
+            )
+
+        trade_rows.append(
+            [
+                trade.pk,
+                trade.user_id,
+                trade.account_id,
+                trade.account.name if trade.account else tr('common.main_account', language=language, default='Compte principal'),
+                _local_datetime_for_excel(trade.executed_at),
+                trade.symbol,
+                trade.market,
+                trade.direction,
+                trade.result,
+                trade.resolved_result,
+                trade.setup,
+                trade.entry_price,
+                trade.rr_ratio,
+                trade.exit_price,
+                trade.quantity,
+                trade.lot_size,
+                trade.gp_value,
+                trade.fees,
+                trade.risk_amount,
+                trade.risk_percent,
+                trade.capital_base,
+                trade.gross_pnl,
+                trade.net_pnl,
+                trade.risk_reward,
+                trade.confidence,
+                trade.notes,
+                legacy_path,
+                len(serialized_screenshots),
+                ' | '.join(name for name in screenshot_names if name),
+                ' | '.join(url for url in screenshot_urls if url),
+                _local_datetime_for_excel(trade.created_at),
+                _local_datetime_for_excel(trade.updated_at),
+            ]
+        )
+
+    _append_export_sheet(
+        workbook,
+        'Trades',
+        [
+            'id',
+            'user_id',
+            'account_id',
+            'account_name',
+            'executed_at',
+            'symbol',
+            'market',
+            'direction',
+            'result',
+            'resolved_result',
+            'setup',
+            'entry_price',
+            'rr_ratio',
+            'exit_price',
+            'quantity',
+            'lot_size',
+            'gp_value',
+            'fees',
+            'risk_amount',
+            'risk_percent',
+            'capital_base',
+            'gross_pnl',
+            'net_pnl',
+            'risk_reward',
+            'confidence',
+            'notes',
+            'legacy_screenshot_path',
+            'screenshot_count',
+            'screenshot_names',
+            'screenshot_urls',
+            'created_at',
+            'updated_at',
+        ],
+        trade_rows,
+    )
+    _append_export_sheet(
+        workbook,
+        'Mouvements',
+        [
+            'id',
+            'user_id',
+            'account_id',
+            'account_name',
+            'kind',
+            'amount',
+            'occurred_at',
+            'note',
+            'created_at',
+            'updated_at',
+        ],
+        [[
+            movement.pk,
+            movement.user_id,
+            movement.account_id,
+            movement.account.name if movement.account else tr('common.main_account', language=language, default='Compte principal'),
+            movement.kind,
+            movement.amount,
+            _local_datetime_for_excel(movement.occurred_at),
+            movement.note,
+            _local_datetime_for_excel(movement.created_at),
+            _local_datetime_for_excel(movement.updated_at),
+        ] for movement in movements],
+    )
+    _append_export_sheet(
+        workbook,
+        'Captures',
+        [
+            'trade_id',
+            'account_id',
+            'account_name',
+            'symbol',
+            'trade_executed_at',
+            'source',
+            'screenshot_id',
+            'sort_order',
+            'file_name',
+            'file_path',
+            'file_url',
+            'created_at',
+        ],
+        screenshot_rows,
+    )
+
+    summary_sheet.freeze_panes = 'A2'
+    _autosize_export_columns(summary_sheet)
+
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 def attach_trade_screenshots(trade, uploaded_files):

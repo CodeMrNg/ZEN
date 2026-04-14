@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -19,6 +19,7 @@ from .forms import (
     LoginForm,
     SignUpForm,
     TradeCreateForm,
+    TradingDataExportForm,
     TradingAccountForm,
     TradingAccountEditForm,
     TradingPasswordChangeForm,
@@ -32,6 +33,7 @@ from .services import (
     build_account_label,
     build_transactions_payload_for_user,
     build_dashboard_payload_for_user,
+    build_user_data_export_workbook,
     clear_demo_trades_for_user,
     create_capital_movement_for_user,
     create_trade_for_user,
@@ -267,6 +269,7 @@ def settings_view(request):
         initial={'set_active': True},
         language=language,
     )
+    export_form = TradingDataExportForm(language=language)
     editing_account = active_account
     password_form = TradingPasswordChangeForm(request.user, language=language)
     delete_account_form = DeleteAccountForm(user=request.user, language=language)
@@ -468,6 +471,23 @@ def settings_view(request):
                     language=language,
                     default='Action reservee au super administrateur.',
                 )
+        elif action == 'export_data':
+            export_form = TradingDataExportForm(request.POST, language=language)
+            if export_form.is_valid():
+                export_scope = export_form.get_scope()
+                workbook = build_user_data_export_workbook(
+                    request.user,
+                    export_scope,
+                    language=language,
+                    base_url=request.build_absolute_uri('/'),
+                )
+                filename = f"zen-trading-export-{export_scope.get('filename_token') or 'all-time'}.xlsx"
+                response = HttpResponse(
+                    workbook,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                )
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
         elif action == 'delete_account':
             delete_account_form = DeleteAccountForm(request.POST, user=request.user, language=language)
             if delete_account_form.is_valid():
@@ -516,6 +536,7 @@ def settings_view(request):
             'show_account_edit_modal': show_account_edit_modal,
             'password_form': password_form,
             'delete_account_form': delete_account_form,
+            'export_form': export_form,
             'success_message': success_message,
             'error_message': error_message,
             'server_refresh': server_refresh,

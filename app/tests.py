@@ -1330,8 +1330,10 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(trade.result, Trade.Result.TAKE_PROFIT)
         self.assertEqual(trade.rr_ratio, Decimal('1.50'))
         self.assertEqual(trade.gp_value, Decimal('150.00'))
-        self.assertEqual(trade.capital_base, Decimal('10000.00'))
+        self.assertEqual(trade.capital_base, Decimal('10095.00'))
         self.assertEqual(trade.risk_amount, Decimal('100.00'))
+        self.assertEqual(trade.risk_percent, Decimal('0.99'))
+        self.assertEqual(response.json()['trade']['capital_change_percent_label'], '+1.49%')
 
     def test_trade_update_api_can_remove_existing_screenshots(self):
         trade = self.create_trade()

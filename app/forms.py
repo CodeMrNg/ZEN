@@ -325,7 +325,9 @@ class TradeCreateForm(forms.ModelForm):
 
     def save(self, commit=True):
         trade = super().save(commit=False)
-        if self.preferences and not trade.pk:
+        if self.capital_base_override is not None:
+            trade.capital_base = self.capital_base_override
+        elif self.preferences and not trade.pk:
             trade.capital_base = self.capital_base_override or self.preferences.capital_base
         elif not trade.capital_base and self.preferences:
             trade.capital_base = self.capital_base_override or self.preferences.capital_base

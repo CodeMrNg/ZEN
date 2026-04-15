@@ -1646,6 +1646,7 @@ def create_trade_for_user(user_id, payload, files, form_class, language=None):
 def update_trade_for_user(user_id, trade_id, payload, files, form_class, language=None):
     preferences = get_or_create_preferences_for_user(user_id)
     active_account = get_or_create_active_account_for_user(user_id, preferences)
+    current_capital = get_current_capital_for_user(user_id, preferences, account=active_account)
     trade = filter_queryset_for_account(
         Trade.objects.filter(user_id=user_id, pk=trade_id),
         active_account,
@@ -1653,7 +1654,14 @@ def update_trade_for_user(user_id, trade_id, payload, files, form_class, languag
     if not trade:
         return {'ok': False, 'message': tr('dashboard.modal.trade', language=language, default='Trade') + ' introuvable.'}
 
-    form = form_class(payload, files, instance=trade, preferences=preferences, language=language)
+    form = form_class(
+        payload,
+        files,
+        instance=trade,
+        preferences=preferences,
+        capital_base_override=current_capital,
+        language=language,
+    )
     if not form.is_valid():
         return {'ok': False, 'errors': form.errors.get_json_data()}
 

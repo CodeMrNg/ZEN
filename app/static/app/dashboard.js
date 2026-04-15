@@ -563,6 +563,17 @@ if (appNode) {
     }
 
     function getPreviewCapitalContext() {
+        const currentCapital = state.preferences?.current_capital
+            || appNode.dataset.currentCapital;
+        if (Number.isFinite(Number.parseFloat(currentCapital)) && Number.parseFloat(currentCapital) > 0) {
+            return {
+                value: Number.parseFloat(currentCapital),
+                formatted: state.preferences?.current_capital_formatted
+                    || formatCurrency(currentCapital, state.preferences?.currency || "USD"),
+                label: strings.currentCapitalPrefix,
+            };
+        }
+
         if (state.editingTradeId && state.editingCapitalBase) {
             return {
                 value: Number.parseFloat(state.editingCapitalBase),
@@ -572,15 +583,13 @@ if (appNode) {
             };
         }
 
-        const currentCapital = state.preferences?.current_capital
-            || appNode.dataset.currentCapital
-            || state.preferences?.capital_base
+        const fallbackCapital = state.preferences?.capital_base
             || appNode.dataset.capitalBase
             || "0";
         return {
-            value: Number.parseFloat(currentCapital),
-            formatted: state.preferences?.current_capital_formatted
-                || formatCurrency(currentCapital, state.preferences?.currency || "USD"),
+            value: Number.parseFloat(fallbackCapital),
+            formatted: state.preferences?.capital_base_formatted
+                || formatCurrency(fallbackCapital, state.preferences?.currency || "USD"),
             label: strings.currentCapitalPrefix,
         };
     }

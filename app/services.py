@@ -625,6 +625,43 @@ def get_current_capital_for_user(user_id, preferences=None, account=None):
     return (account.capital_base + total_trade_pnl + total_deposits - total_withdrawals).quantize(Decimal('0.01'))
 
 
+def get_capital_before_trade_for_user(user_id, executed_at, preferences=None, account=None, exclude_trade=None):
+    preferences = preferences or get_or_create_preferences_for_user(user_id)
+    account = account or get_or_create_active_account_for_user(user_id, preferences)
+    trade_filters = models.Q(executed_at__lt=executed_at)
+    movement_filters = models.Q(occurred_at__lt=executed_at)
+
+    if exclude_trade is None:
+        trade_filters |= models.Q(executed_at=executed_at)
+        movement_filters |= models.Q(occurred_at=executed_at)
+    else:
+        trade_filters |= models.Q(executed_at=executed_at, created_at__lt=exclude_trade.created_at)
+        movement_filters |= models.Q(occurred_at=executed_at, created_at__lt=exclude_trade.created_at)
+
+    trades = filter_queryset_for_account(
+        Trade.objects.filter(user_id=user_id).filter(trade_filters).order_by('executed_at', 'created_at', 'pk'),
+        account,
+    )
+    if exclude_trade is not None:
+        trades = trades.exclude(pk=exclude_trade.pk)
+
+    movements = filter_queryset_for_account(
+        CapitalMovement.objects.filter(user_id=user_id).filter(movement_filters).order_by('occurred_at', 'created_at', 'pk'),
+        account,
+    )
+
+    total_trade_pnl = sum((trade.net_pnl for trade in trades), Decimal('0.00'))
+    total_deposits = sum(
+        (movement.amount for movement in movements if movement.kind == CapitalMovement.Kind.DEPOSIT),
+        Decimal('0.00'),
+    )
+    total_withdrawals = sum(
+        (movement.amount for movement in movements if movement.kind == CapitalMovement.Kind.WITHDRAWAL),
+        Decimal('0.00'),
+    )
+    return (account.capital_base + total_trade_pnl + total_deposits - total_withdrawals).quantize(Decimal('0.01'))
+
+
 def serialize_preferences(preferences, current_capital=None, account=None, language=None):
     account = account or preferences.active_account
     capital_base = account.capital_base if account else preferences.capital_base
@@ -1623,16 +1660,21 @@ def create_trade_for_user(user_id, payload, files, form_class, language=None):
     user = get_user_model().objects.get(pk=user_id)
     preferences = get_or_create_preferences_for_user(user_id)
     active_account = get_or_create_active_account_for_user(user_id, preferences)
-    current_capital = get_current_capital_for_user(user_id, preferences, account=active_account)
     form = form_class(
         payload,
         files,
         preferences=preferences,
-        capital_base_override=current_capital,
         language=language,
     )
     if not form.is_valid():
         return {'ok': False, 'errors': form.errors.get_json_data()}
+
+    form.capital_base_override = get_capital_before_trade_for_user(
+        user_id,
+        form.cleaned_data['executed_at'],
+        preferences=preferences,
+        account=active_account,
+    )
 
     with transaction.atomic():
         trade = form.save(commit=False)
@@ -1646,7 +1688,6 @@ def create_trade_for_user(user_id, payload, files, form_class, language=None):
 def update_trade_for_user(user_id, trade_id, payload, files, form_class, language=None):
     preferences = get_or_create_preferences_for_user(user_id)
     active_account = get_or_create_active_account_for_user(user_id, preferences)
-    current_capital = get_current_capital_for_user(user_id, preferences, account=active_account)
     trade = filter_queryset_for_account(
         Trade.objects.filter(user_id=user_id, pk=trade_id),
         active_account,
@@ -1659,11 +1700,18 @@ def update_trade_for_user(user_id, trade_id, payload, files, form_class, languag
         files,
         instance=trade,
         preferences=preferences,
-        capital_base_override=current_capital,
         language=language,
     )
     if not form.is_valid():
         return {'ok': False, 'errors': form.errors.get_json_data()}
+
+    form.capital_base_override = get_capital_before_trade_for_user(
+        user_id,
+        form.cleaned_data['executed_at'],
+        preferences=preferences,
+        account=active_account,
+        exclude_trade=trade,
+    )
 
     with transaction.atomic():
         updated_trade = form.save(commit=False)

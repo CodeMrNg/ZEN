@@ -8,8 +8,8 @@ if (appNode) {
         gainCapital: "Gain sur capital (%)",
         lossCapital: "Perte sur capital (%)",
         impactCapital: "Impact sur capital (%)",
-        currentCapitalPrefix: "Calcul base sur le capital actuel de",
-        referenceCapitalPrefix: "Calcul base sur un capital de",
+        currentCapitalPrefix: "Apercu local sur un capital de",
+        referenceCapitalPrefix: "Capital de reference enregistre",
         newTrade: "Nouveau trade",
         editTrade: "Modifier le trade",
         saveTrade: "Enregistrer le trade",
@@ -82,8 +82,8 @@ if (appNode) {
         gainCapital: "Capital gain (%)",
         lossCapital: "Capital loss (%)",
         impactCapital: "Capital impact (%)",
-        currentCapitalPrefix: "Calculated from the current capital of",
-        referenceCapitalPrefix: "Calculated from a capital of",
+        currentCapitalPrefix: "Local preview based on a capital of",
+        referenceCapitalPrefix: "Stored reference capital",
         newTrade: "New trade",
         editTrade: "Edit trade",
         saveTrade: "Save trade",
@@ -563,17 +563,6 @@ if (appNode) {
     }
 
     function getPreviewCapitalContext() {
-        const currentCapital = state.preferences?.current_capital
-            || appNode.dataset.currentCapital;
-        if (Number.isFinite(Number.parseFloat(currentCapital)) && Number.parseFloat(currentCapital) > 0) {
-            return {
-                value: Number.parseFloat(currentCapital),
-                formatted: state.preferences?.current_capital_formatted
-                    || formatCurrency(currentCapital, state.preferences?.currency || "USD"),
-                label: strings.currentCapitalPrefix,
-            };
-        }
-
         if (state.editingTradeId && state.editingCapitalBase) {
             return {
                 value: Number.parseFloat(state.editingCapitalBase),
@@ -583,13 +572,15 @@ if (appNode) {
             };
         }
 
-        const fallbackCapital = state.preferences?.capital_base
+        const currentCapital = state.preferences?.current_capital
+            || appNode.dataset.currentCapital
+            || state.preferences?.capital_base
             || appNode.dataset.capitalBase
             || "0";
         return {
-            value: Number.parseFloat(fallbackCapital),
-            formatted: state.preferences?.capital_base_formatted
-                || formatCurrency(fallbackCapital, state.preferences?.currency || "USD"),
+            value: Number.parseFloat(currentCapital),
+            formatted: state.preferences?.current_capital_formatted
+                || formatCurrency(currentCapital, state.preferences?.currency || "USD"),
             label: strings.currentCapitalPrefix,
         };
     }

@@ -442,9 +442,7 @@
                             <strong class="field-static-value is-profit" id="capital-impact-percent">+0%</strong>
                         </div>
                         <small class="field-help" id="trade-capital-hint">
-                            {% with capital_value=trade_current_capital|compact_number_grouped %}
-                                {% tr 'dashboard.trade_form.capital_hint' 'Calcul base sur un capital actuel de {capital}.' capital=trade_preferences.currency_symbol|add:capital_value %}
-                            {% endwith %}
+                            {% tr 'dashboard.trade_form.capital_hint' 'Le capital de reference final est recalcule juste avant la date du trade.' %}
                         </small>
                         <small class="field-help">{% tr 'dashboard.trade_form.capital_help' 'TP = gain, SL = perte, BE = 0%.' %}</small>
                     </div>

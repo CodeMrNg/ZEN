@@ -916,7 +916,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(len(trade_payload['screenshots']), 2)
         self.assertTrue(trade_payload['screenshot_url'])
 
-    def test_trade_creation_api_uses_current_capital_as_reference(self):
+    def test_trade_creation_api_uses_capital_before_trade_execution_as_reference(self):
         TradingPreference.objects.update_or_create(
             user=self.user,
             defaults={
@@ -924,19 +924,43 @@ class TradingJournalApiTests(TestCase):
                 'default_symbol': 'XAUUSD',
             },
         )
-        self.create_trade()
+        account = self.get_active_account()
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 3, 20, 8, 30)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Morning breakout',
+            entry_price=Decimal('3000.0000'),
+            rr_ratio=Decimal('2.50'),
+            exit_price=Decimal('3010.0000'),
+            quantity=Decimal('100.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('125.00'),
+            fees=Decimal('5.00'),
+            risk_amount=Decimal('40.00'),
+            risk_percent=Decimal('0.40'),
+            capital_base=Decimal('10000.00'),
+            confidence=4,
+            notes='Trade precedent',
+        )
         CapitalMovement.objects.create(
             user=self.user,
+            account=account,
             kind=CapitalMovement.Kind.DEPOSIT,
             amount=Decimal('500.00'),
-            occurred_at=timezone.now(),
+            occurred_at=timezone.make_aware(datetime(2026, 3, 20, 9, 0)),
             note='Ajout de capital',
         )
         CapitalMovement.objects.create(
             user=self.user,
+            account=account,
             kind=CapitalMovement.Kind.WITHDRAWAL,
             amount=Decimal('200.00'),
-            occurred_at=timezone.now(),
+            occurred_at=timezone.make_aware(datetime(2026, 3, 20, 9, 30)),
             note='Retrait profit',
         )
 
@@ -1296,7 +1320,59 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(response.json()['movement']['amount_label'], '-$150')
 
     def test_trade_update_api_updates_trade(self):
-        trade = self.create_trade()
+        account = self.get_active_account()
+        Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 3, 20, 8, 30)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Morning breakout',
+            entry_price=Decimal('3000.0000'),
+            rr_ratio=Decimal('2.50'),
+            exit_price=Decimal('3010.0000'),
+            quantity=Decimal('100.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('125.00'),
+            fees=Decimal('5.00'),
+            risk_amount=Decimal('40.00'),
+            risk_percent=Decimal('0.40'),
+            capital_base=Decimal('10000.00'),
+            confidence=4,
+            notes='Trade precedent',
+        )
+        CapitalMovement.objects.create(
+            user=self.user,
+            account=account,
+            kind=CapitalMovement.Kind.DEPOSIT,
+            amount=Decimal('300.00'),
+            occurred_at=timezone.make_aware(datetime(2026, 3, 21, 8, 0)),
+            note='Ajout avant trade',
+        )
+        trade = Trade.objects.create(
+            user=self.user,
+            account=account,
+            executed_at=timezone.make_aware(datetime(2026, 3, 22, 8, 0)),
+            symbol='XAUUSD',
+            market='Commodities',
+            direction=Trade.Direction.LONG,
+            result=Trade.Result.TAKE_PROFIT,
+            setup='Breakout',
+            entry_price=Decimal('1.1000'),
+            rr_ratio=Decimal('2.50'),
+            exit_price=Decimal('1.1250'),
+            quantity=Decimal('100.00'),
+            lot_size=Decimal('1.00'),
+            gp_value=Decimal('125.00'),
+            fees=Decimal('5.00'),
+            risk_amount=Decimal('40.00'),
+            risk_percent=Decimal('0.39'),
+            capital_base=Decimal('10395.00'),
+            confidence=4,
+            notes='Trade test',
+        )
         TradingPreference.objects.update_or_create(
             user=self.user,
             defaults={
@@ -1330,10 +1406,10 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(trade.result, Trade.Result.TAKE_PROFIT)
         self.assertEqual(trade.rr_ratio, Decimal('1.50'))
         self.assertEqual(trade.gp_value, Decimal('150.00'))
-        self.assertEqual(trade.capital_base, Decimal('10095.00'))
+        self.assertEqual(trade.capital_base, Decimal('10395.00'))
         self.assertEqual(trade.risk_amount, Decimal('100.00'))
-        self.assertEqual(trade.risk_percent, Decimal('0.99'))
-        self.assertEqual(response.json()['trade']['capital_change_percent_label'], '+1.49%')
+        self.assertEqual(trade.risk_percent, Decimal('0.96'))
+        self.assertEqual(response.json()['trade']['capital_change_percent_label'], '+1.44%')
 
     def test_trade_update_api_can_remove_existing_screenshots(self):
         trade = self.create_trade()

@@ -232,6 +232,7 @@ def tools_view(request):
     preferences = get_or_create_preferences_for_user(request.user.pk)
     active_account = get_or_create_active_account_for_user(request.user.pk, preferences)
     current_capital = get_current_capital_for_user(request.user.pk, preferences, account=active_account)
+    default_risk_amount = current_capital * (preferences.default_risk_percent / Decimal('100'))
     risk_one_percent = current_capital * Decimal('0.01')
     risk_two_percent = current_capital * Decimal('0.02')
     return render(
@@ -243,6 +244,7 @@ def tools_view(request):
             'trading_accounts': get_trading_accounts_for_user(request.user.pk),
             'current_capital': current_capital,
             'current_capital_formatted': format_currency(current_capital, active_account.currency),
+            'default_risk_amount_formatted': format_currency(default_risk_amount, active_account.currency),
             'risk_one_percent_formatted': format_currency(risk_one_percent, active_account.currency),
             'risk_two_percent_formatted': format_currency(risk_two_percent, active_account.currency),
             'initial_capital_formatted': format_currency(active_account.capital_base, active_account.currency),

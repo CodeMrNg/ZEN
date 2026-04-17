@@ -7,18 +7,20 @@
     const langCode = (document.documentElement.lang || "fr").toLowerCase();
     const locale = document.body.dataset.uiLocale || "fr-FR";
     const currencyCode = app.dataset.currencyCode || "USD";
+    const defaultRiskPercent = Math.max(0, parseNumber(app.dataset.defaultRiskPercent, 1));
     const toolsModal = document.getElementById("tools-modal");
     const toolsModalTitle = document.getElementById("tools-modal-title");
     const toolsModalCopy = document.getElementById("tools-modal-copy");
     const toolPanels = Array.from(app.querySelectorAll("[data-tool-panel]"));
     const calculatorHistoryNode = document.getElementById("calculator-history");
     const calculatorDisplayNode = document.getElementById("calculator-display");
-    let activeTool = "calculator";
+    let activeTool = "risk-trade";
 
     const strings = langCode.startsWith("fr") ? {
         calculatorError: "Erreur",
         toolDefaultTitle: "Outil",
         toolDefaultCopy: "Execute les calculs de ce module dans le compte actif.",
+        riskTradeNote: "{percent} du capital actuel = {value}.",
         marginUsed: "Marge utilisee: {value} du capital.",
         ruinNotePositive: "Estimation probabiliste basee sur le win rate, le payoff moyen et le risque par trade.",
         ruinNoteNegative: "Expectancy negative ou nulle: la probabilite de ruine est consideree comme elevee.",
@@ -26,6 +28,7 @@
         calculatorError: "Error",
         toolDefaultTitle: "Tool",
         toolDefaultCopy: "Run calculations for this module using the active account.",
+        riskTradeNote: "{percent} of current capital = {value}.",
         marginUsed: "Margin used: {value} of capital.",
         ruinNotePositive: "Probability estimate based on win rate, average payoff, and risk per trade.",
         ruinNoteNegative: "Negative or zero expectancy: risk of ruin is considered high.",
@@ -423,6 +426,21 @@
         }
     }
 
+    function calculateRiskPerTrade() {
+        const capital = Math.max(0, parseNumber(document.getElementById("risk-trade-capital")?.value));
+        const riskPercent = defaultRiskPercent;
+        const riskAmount = capital * (riskPercent / 100);
+
+        setText("risk-trade-badge", formatPercent(riskPercent));
+        setText("risk-trade-amount", formatCurrency(riskAmount));
+        setText(
+            "risk-trade-note",
+            strings.riskTradeNote
+                .replace("{percent}", formatPercent(riskPercent))
+                .replace("{value}", formatCurrency(riskAmount)),
+        );
+    }
+
     function calculatePositionSize() {
         const capital = parseNumber(document.getElementById("position-capital")?.value);
         const riskPercent = parseNumber(document.getElementById("position-risk")?.value);
@@ -597,6 +615,7 @@
     }
 
     function recomputeAll() {
+        calculateRiskPerTrade();
         calculateCompound();
         calculatePositionSize();
         calculateSLTP();
@@ -690,7 +709,7 @@
     app.addEventListener("input", recomputeAll);
     app.addEventListener("change", recomputeAll);
 
-    setActiveTool("calculator");
+    setActiveTool("risk-trade");
     clearCalculator();
     recomputeAll();
 }());

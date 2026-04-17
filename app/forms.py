@@ -367,6 +367,7 @@ class TradingPreferenceForm(forms.ModelForm):
             'default_direction',
             'default_setup',
             'default_lot_size',
+            'default_risk_percent',
             'default_fees',
             'default_confidence',
             'default_dashboard_year',
@@ -379,6 +380,7 @@ class TradingPreferenceForm(forms.ModelForm):
             'default_direction': 'Direction par defaut',
             'default_setup': 'Setup par defaut',
             'default_lot_size': 'Quantite par defaut (lots)',
+            'default_risk_percent': 'Risque par defaut (%)',
             'default_fees': 'G/P par defaut',
             'default_confidence': 'Confiance par defaut',
             'default_dashboard_year': 'Annee dashboard par defaut',
@@ -410,6 +412,7 @@ class TradingPreferenceForm(forms.ModelForm):
         self.fields['default_direction'].label = tr(self.language, 'form.preferences.default_direction', 'Direction par defaut')
         self.fields['default_setup'].label = tr(self.language, 'form.preferences.default_setup', 'Setup par defaut')
         self.fields['default_lot_size'].label = tr(self.language, 'form.preferences.default_lots', 'Quantite par defaut (lots)')
+        self.fields['default_risk_percent'].label = tr(self.language, 'form.preferences.default_risk', 'Risque par defaut (%)')
         self.fields['default_fees'].label = tr(self.language, 'form.preferences.default_gp', 'G/P par defaut')
         self.fields['default_confidence'].label = tr(self.language, 'form.preferences.default_confidence', 'Confiance par defaut')
         self.fields['default_dashboard_year'].label = tr(self.language, 'form.preferences.default_dashboard_year', 'Annee dashboard par defaut')

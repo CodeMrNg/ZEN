@@ -288,6 +288,17 @@
                             </div>
 
                             <div class="field-group">
+                                <label for="{{ preferences_form.default_risk_percent.id_for_label }}">{{ preferences_form.default_risk_percent.label }}</label>
+                                {{ preferences_form.default_risk_percent }}
+                                <small class="field-help">
+                                    {% tr 'settings.section.default_risk_help' 'Cette valeur alimente le formulaire Nouveau trade et l outil Risque par trade.' %}
+                                </small>
+                                {% for error in preferences_form.default_risk_percent.errors %}
+                                    <div class="field-error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="field-group">
                                 <label for="{{ preferences_form.default_fees.id_for_label }}">{{ preferences_form.default_fees.label }}</label>
                                 {{ preferences_form.default_fees }}
                                 {% for error in preferences_form.default_fees.errors %}
@@ -395,6 +406,10 @@
                     <article class="detail-card">
                         <span>{% tr 'settings.section.default_lots' 'Lots par defaut' %}</span>
                         <strong>{{ preferences.default_lot_size|compact_number }}</strong>
+                    </article>
+                    <article class="detail-card">
+                        <span>{% tr 'settings.section.default_risk' 'Risque par defaut' %}</span>
+                        <strong>{{ preferences.default_risk_percent|compact_number }}%</strong>
                     </article>
                     <article class="detail-card">
                         <span>{% tr 'settings.section.default_gp' 'G/P par defaut' %}</span>

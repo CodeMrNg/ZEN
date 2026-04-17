@@ -11,6 +11,7 @@
     data-current-capital="{{ current_capital|compact_number }}"
     data-initial-capital="{{ active_account.capital_base|compact_number }}"
     data-currency-code="{{ active_account.currency }}"
+    data-default-risk-percent="{{ trade_preferences.default_risk_percent|compact_number }}"
 >
     <aside class="sidebar" data-sidebar>
         <div class="sidebar-topbar">
@@ -130,17 +131,29 @@
                 <div class="tool-card-copy">
                     <span class="tool-card-icon">01</span>
                     <div>
-                        <p class="panel-kicker">Calculatrice</p>
-                        <h2>Calculatrice rapide</h2>
-                        <p>Une vraie calculatrice a boutons pour les operations instantanees.</p>
+                        <p class="panel-kicker">Risque</p>
+                        <h2>Risque par trade</h2>
+                        <p>Prend le capital actuel, applique le pourcentage defini dans les parametres et donne le montant a risquer.</p>
                     </div>
                 </div>
-                <button type="button" class="primary-button button-block" data-ui-modal-open="tools-modal" data-tool-open="calculator" data-tool-title="Calculatrice rapide" data-tool-copy="Effectue des calculs rapides avec un vrai pave numerique.">Ouvrir l'outil</button>
+                <button type="button" class="primary-button button-block" data-ui-modal-open="tools-modal" data-tool-open="risk-trade" data-tool-title="Risque par trade" data-tool-copy="Calcule instantanement le montant a risquer a partir du capital actuel et du pourcentage defini dans les parametres.">Ouvrir l'outil</button>
             </article>
 
             <article class="tool-card">
                 <div class="tool-card-copy">
                     <span class="tool-card-icon">02</span>
+                    <div>
+                        <p class="panel-kicker">Calculatrice</p>
+                        <h2>Calculatrice rapide</h2>
+                        <p>Une vraie calculatrice a boutons pour les operations instantanees.</p>
+                    </div>
+                </div>
+                <button type="button" class="ghost-button button-block" data-ui-modal-open="tools-modal" data-tool-open="calculator" data-tool-title="Calculatrice rapide" data-tool-copy="Effectue des calculs rapides avec un vrai pave numerique.">Ouvrir l'outil</button>
+            </article>
+
+            <article class="tool-card">
+                <div class="tool-card-copy">
+                    <span class="tool-card-icon">03</span>
                     <div>
                         <p class="panel-kicker">Projection</p>
                         <h2>Calculateur de benefice compose</h2>
@@ -152,7 +165,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">03</span>
+                    <span class="tool-card-icon">04</span>
                     <div>
                         <p class="panel-kicker">Risque</p>
                         <h2>Calculateur de taille de position</h2>
@@ -164,7 +177,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">04</span>
+                    <span class="tool-card-icon">05</span>
                     <div>
                         <p class="panel-kicker">Execution</p>
                         <h2>Calculateur SL / TP</h2>
@@ -176,7 +189,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">05</span>
+                    <span class="tool-card-icon">06</span>
                     <div>
                         <p class="panel-kicker">Performance</p>
                         <h2>Calculateur de perte / profit</h2>
@@ -188,7 +201,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">06</span>
+                    <span class="tool-card-icon">07</span>
                     <div>
                         <p class="panel-kicker">Levier</p>
                         <h2>Calculateur de marge</h2>
@@ -200,7 +213,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">07</span>
+                    <span class="tool-card-icon">08</span>
                     <div>
                         <p class="panel-kicker">Pips</p>
                         <h2>Calculateur de valeur pip</h2>
@@ -212,7 +225,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">08</span>
+                    <span class="tool-card-icon">09</span>
                     <div>
                         <p class="panel-kicker">Niveaux</p>
                         <h2>Calculateur de Fibonacci</h2>
@@ -224,7 +237,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">09</span>
+                    <span class="tool-card-icon">10</span>
                     <div>
                         <p class="panel-kicker">Session</p>
                         <h2>Calculateur de points de pivot</h2>
@@ -236,7 +249,7 @@
 
             <article class="tool-card">
                 <div class="tool-card-copy">
-                    <span class="tool-card-icon">10</span>
+                    <span class="tool-card-icon">11</span>
                     <div>
                         <p class="panel-kicker">Capital</p>
                         <h2>Drawdown & risque de ruine</h2>
@@ -254,15 +267,40 @@
                 <div class="dashboard-modal-header">
                     <div>
                         <p class="panel-kicker">Outil</p>
-                        <h2 id="tools-modal-title">Calculatrice rapide</h2>
-                        <p class="dashboard-modal-subtitle" id="tools-modal-copy">Choisis un module depuis le catalogue pour ouvrir l'outil correspondant.</p>
+                        <h2 id="tools-modal-title">Risque par trade</h2>
+                        <p class="dashboard-modal-subtitle" id="tools-modal-copy">Calcule instantanement le montant a risquer a partir du capital actuel et du pourcentage defini dans les parametres.</p>
                     </div>
                     <button type="button" class="modal-close" data-ui-modal-close="tools-modal" aria-label="Fermer l'outil">X</button>
                 </div>
 
                 <div class="dashboard-modal-body">
                     <section class="tools-grid tools-modal-grid">
-            <article class="panel tool-panel is-active" data-tool-panel="calculator">
+            <article class="panel tool-panel is-active" data-tool-panel="risk-trade">
+                <div class="panel-heading">
+                    <div>
+                        <p class="panel-kicker">Risque</p>
+                        <h2>Risque par trade</h2>
+                    </div>
+                    <div class="panel-actions">
+                        <span class="form-badge" id="risk-trade-badge">{{ trade_preferences.default_risk_percent|compact_number }}%</span>
+                        <a href="{% url 'app:settings' %}" class="ghost-button">Parametres</a>
+                    </div>
+                </div>
+                <article class="tool-single-result">
+                    <span>Montant a risquer</span>
+                    <strong id="risk-trade-amount">{{ default_risk_amount_formatted }}</strong>
+                    <p class="tool-note" id="risk-trade-note">{{ trade_preferences.default_risk_percent|compact_number }}% du capital actuel = {{ default_risk_amount_formatted }}.</p>
+                </article>
+                <p class="tool-copy">Le pourcentage utilise ici vient des parametres. Modifie-le dans Parametres si tu veux changer ta base de risque.</p>
+                <div class="form-grid">
+                    <div class="field-group field-span-2">
+                        <label for="risk-trade-capital">Capital actuel</label>
+                        <input id="risk-trade-capital" type="number" step="0.01" value="{{ current_capital|compact_number }}">
+                    </div>
+                </div>
+            </article>
+
+            <article class="panel tool-panel" data-tool-panel="calculator">
                 <div class="panel-heading">
                     <div>
                         <p class="panel-kicker">Calculatrice</p>

@@ -568,6 +568,7 @@ class TradingJournalApiTests(TestCase):
                 'default_direction': 'SHORT',
                 'default_setup': 'Asia reversal',
                 'default_lot_size': '2.50',
+                'default_risk_percent': '3.00',
                 'default_fees': '3.75',
                 'default_confidence': '4',
                 'default_dashboard_year': str(previous_year),
@@ -591,6 +592,7 @@ class TradingJournalApiTests(TestCase):
                 'default_direction': 'SHORT',
                 'default_setup': 'Asia reversal',
                 'default_lot_size': '2.50',
+                'default_risk_percent': '3.00',
                 'default_fees': '3.75',
                 'default_confidence': '4',
                 'default_dashboard_year': str(timezone.localdate().year),
@@ -1513,6 +1515,7 @@ class TradingJournalApiTests(TestCase):
                 'default_direction': 'SHORT',
                 'default_setup': 'Asia reversal',
                 'default_lot_size': '2.50',
+                'default_risk_percent': '3.00',
                 'default_fees': '3.75',
                 'default_confidence': '4',
                 'default_dashboard_year': str(timezone.localdate().year),
@@ -1528,6 +1531,7 @@ class TradingJournalApiTests(TestCase):
         self.assertEqual(preferences.default_direction, Trade.Direction.SHORT)
         self.assertEqual(preferences.default_setup, 'Asia reversal')
         self.assertEqual(preferences.ui_language, 'fr')
+        self.assertEqual(preferences.default_risk_percent, Decimal('3.00'))
         self.assertEqual(preferences.capital_base, Decimal('25000.00'))
         self.assertEqual(preferences.currency, TradingPreference.Currency.EUR)
         self.assertEqual(preferences.default_week_start_day, calendar.MONDAY)
@@ -2003,11 +2007,20 @@ class TradingJournalApiTests(TestCase):
         self.assertNotContains(response, 'https://instagram.com/akili')
 
     def test_tools_view_renders_core_calculators(self):
+        preferences, _ = TradingPreference.objects.get_or_create(user=self.user)
+        preferences.default_risk_percent = Decimal('3.00')
+        preferences.save(update_fields=['default_risk_percent', 'updated_at'])
         self.get_active_account()
 
         response = self.client.get(reverse('app:tools'))
+        content = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Outils de trading')
+        self.assertContains(response, 'Risque par trade')
+        self.assertContains(response, 'data-default-risk-percent="3"')
+        self.assertContains(response, '>3%</span>', html=False)
+        self.assertContains(response, 'Parametres')
         self.assertContains(response, 'Calculateur de taille de position')
         self.assertContains(response, 'Calculateur de risque de ruine')
+        self.assertLess(content.index('Risque par trade'), content.index('Calculatrice rapide'))

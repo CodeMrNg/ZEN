@@ -5,7 +5,8 @@ from django.conf import settings
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
-from django.http import HttpResponse, JsonResponse
+from django.contrib.staticfiles import finders
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -55,6 +56,18 @@ from .services import (
     seed_demo_trades_for_user,
     update_trade_for_user,
 )
+
+
+@require_GET
+def service_worker_view(request):
+    service_worker_path = finders.find('app/service-worker.js')
+    if not service_worker_path:
+        raise Http404("Service worker not found.")
+
+    response = FileResponse(open(service_worker_path, 'rb'), content_type='application/javascript')
+    response['Cache-Control'] = 'no-cache'
+    response['Service-Worker-Allowed'] = '/'
+    return response
 
 
 def apply_language_cookie(response, language):

@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}ZEN TRADING{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}{% tr 'brand.meta_description' 'ZEN TRADING est une plateforme de journal de trading pour piloter vos comptes, votre capital et vos performances depuis un espace unique.' %}{% endblock %}">
+    <meta name="theme-color" content="#c8f800">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="ZEN TRADING">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="{% static 'app/manifest.webmanifest' %}?v={{ app_static_version }}">
     <link rel="icon" type="image/png" href="{% static 'app/favicon.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'app/favicon.png' %}">
     <link rel="apple-touch-icon" href="{% static 'app/favicon.png' %}">
@@ -18,6 +24,7 @@
 <body class="{% block body_class %}{% endblock %}" data-ui-locale="{{ app_language_locale }}">
     {% block content %}{% endblock %}
     <script src="{% static 'app/ui.js' %}?v={{ app_static_version }}" defer></script>
+    <script src="{% static 'app/pwa.js' %}?v={{ app_static_version }}" defer></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

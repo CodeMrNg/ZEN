@@ -5,6 +5,7 @@ from . import views
 app_name = 'app'
 
 urlpatterns = [
+    path('service-worker.js', views.service_worker_view, name='service-worker'),
     path('', views.home_redirect, name='home'),
     path('language/', views.set_language_view, name='set-language'),
     path('login/', views.TradingLoginView.as_view(), name='login'),

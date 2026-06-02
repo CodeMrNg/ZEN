@@ -1,6 +1,6 @@
 const CACHE_NAME = "zen-trading-pwa-20260602-1";
 const APP_SHELL = [
-    "/static/app/offline.html",
+    "/offline/",
     "/static/app/dashboard.css",
     "/static/app/ui.js",
     "/static/app/pwa.js",
@@ -46,7 +46,7 @@ self.addEventListener("fetch", (event) => {
     if (request.mode === "navigate") {
         event.respondWith(
             fetch(request)
-                .catch(() => caches.match("/static/app/offline.html"))
+                .catch(() => caches.match("/offline/"))
         );
         return;
     }
@@ -60,8 +60,8 @@ self.addEventListener("fetch", (event) => {
             return fetch(request).then((response) => {
                 if (response.ok && (
                     url.pathname.startsWith("/static/") ||
-                    url.pathname === "/manifest.webmanifest" ||
-                    url.pathname === "/service-worker.js"
+                    url.pathname === "/manifest.json" ||
+                    url.pathname === "/serviceworker.js"
                 )) {
                     const copy = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));

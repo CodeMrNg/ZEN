@@ -24,6 +24,7 @@ handler500 = "app.error_views.custom_server_error"
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', include('pwa.urls')),
     path('', include('app.urls')),
 ]
 

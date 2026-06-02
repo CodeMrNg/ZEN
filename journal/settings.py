@@ -158,6 +158,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "pwa",
     "app",
 ]
 
@@ -234,6 +235,40 @@ STATIC_ROOT = env_path("STATIC_ROOT", "staticfiles")
 APP_STATIC_VERSION = env("APP_STATIC_VERSION", "20260601-1") or "20260601-1"
 MEDIA_URL = env("MEDIA_URL", "/media/") or "/media/"
 MEDIA_ROOT = env_path("MEDIA_ROOT", "media")
+
+PWA_APP_NAME = "ZEN TRADING"
+PWA_APP_DESCRIPTION = "Journal de trading pour piloter vos comptes, votre capital et vos performances."
+PWA_APP_ROOT_URL = "/gestion/"
+PWA_APP_START_URL = "/gestion/connexion/?next=/gestion/"
+PWA_APP_SCOPE = "/"
+PWA_APP_DISPLAY = "standalone"
+PWA_APP_BACKGROUND_COLOR = "#080b12"
+PWA_APP_THEME_COLOR = "#c8f800"
+PWA_APP_ORIENTATION = "portrait-primary"
+PWA_APP_STATUS_BAR_COLOR = "black-translucent"
+PWA_APP_LANG = "fr"
+PWA_APP_ICONS = [
+    {
+        "src": "/static/app/pwa-icon-192.png",
+        "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "any maskable",
+    },
+    {
+        "src": "/static/app/pwa-icon-512.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable",
+    },
+]
+PWA_APP_ICONS_APPLE = [
+    {
+        "src": "/static/app/favicon.png",
+        "sizes": "512x512",
+    },
+]
+PWA_APP_SPLASH_SCREEN = []
+PWA_SERVICE_WORKER_PATH = BASE_DIR / "app" / "static" / "app" / "service-worker.js"
 
 
 LOGIN_URL = "app:login"

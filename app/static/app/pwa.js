@@ -4,6 +4,7 @@
         installTitle: "Installer ZEN TRADING",
         installCopy: "Ajoutez l'application a votre ecran d'accueil pour y acceder plus vite, meme avec une connexion instable.",
         iosCopy: "Sur iPhone, utilisez le bouton Partager puis Ajouter a l'ecran d'accueil.",
+        unavailableCopy: "Si rien ne s'ouvre, utilisez le menu du navigateur puis Installer l'application ou Ajouter a l'ecran d'accueil.",
         install: "Installer l'application",
         installing: "Ouverture...",
         later: "Plus tard",
@@ -12,6 +13,7 @@
         installTitle: "Install ZEN TRADING",
         installCopy: "Add the app to your home screen for faster access, even with an unstable connection.",
         iosCopy: "On iPhone, use Share, then Add to Home Screen.",
+        unavailableCopy: "If nothing opens, use the browser menu, then Install app or Add to Home Screen.",
         install: "Install app",
         installing: "Opening...",
         later: "Later",
@@ -69,7 +71,10 @@
         banner.querySelector(".pwa-install-banner__dismiss")?.addEventListener("click", dismissBanner);
         banner.querySelector("[data-pwa-install-button]")?.addEventListener("click", async (event) => {
             if (!deferredPrompt) {
-                dismissBanner();
+                const copy = banner?.querySelector(".pwa-install-banner__content p");
+                if (copy) {
+                    copy.textContent = strings.unavailableCopy;
+                }
                 return;
             }
 
@@ -81,6 +86,10 @@
             deferredPrompt = null;
             dismissBanner();
         });
+    }
+
+    function shouldShowInstallBannerOnLoad() {
+        return window.location.pathname === "/gestion/connexion/";
     }
 
     function isIosInstallCandidate() {
@@ -111,6 +120,11 @@
     document.addEventListener("DOMContentLoaded", () => {
         if (isIosInstallCandidate()) {
             window.setTimeout(() => createBanner({ ios: true }), 900);
+            return;
+        }
+
+        if (shouldShowInstallBannerOnLoad()) {
+            window.setTimeout(() => createBanner(), 900);
         }
     }, { once: true });
 })();

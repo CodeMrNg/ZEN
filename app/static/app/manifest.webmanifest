@@ -2,7 +2,7 @@
   "name": "ZEN TRADING",
   "short_name": "ZEN TRADING",
   "description": "Journal de trading pour piloter vos comptes, votre capital et vos performances.",
-  "start_url": "/dashboard/",
+  "start_url": "/gestion/connexion/?next=/gestion/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#080b12",

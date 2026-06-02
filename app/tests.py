@@ -30,6 +30,12 @@ class DashboardAccessTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('app:login'), response.url)
 
+    def test_gestion_dashboard_requires_authentication(self):
+        response = self.client.get(reverse('app:gestion-dashboard'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('app:login'), response.url)
+        self.assertIn('/gestion/', response.url)
+
     def test_transactions_requires_authentication(self):
         response = self.client.get(reverse('app:transactions'))
         self.assertEqual(response.status_code, 302)
@@ -42,11 +48,14 @@ class DashboardAccessTests(TestCase):
 
     def test_auth_pages_mark_first_input_for_autofocus(self):
         login_response = self.client.get(reverse('app:login'))
+        gestion_login_response = self.client.get(reverse('app:gestion-login'), {'next': reverse('app:gestion-dashboard')})
         register_response = self.client.get(reverse('app:register'))
 
         self.assertEqual(login_response.status_code, 200)
+        self.assertEqual(gestion_login_response.status_code, 200)
         self.assertEqual(register_response.status_code, 200)
         self.assertContains(login_response, 'autofocus', html=False)
+        self.assertContains(gestion_login_response, 'autofocus', html=False)
         self.assertContains(register_response, 'autofocus', html=False)
 
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = "zen-trading-pwa-20260601-1";
+const CACHE_NAME = "zen-trading-pwa-20260602-1";
 const APP_SHELL = [
     "/static/app/offline.html",
     "/static/app/dashboard.css",
